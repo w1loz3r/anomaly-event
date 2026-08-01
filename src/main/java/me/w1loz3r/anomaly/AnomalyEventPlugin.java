@@ -395,29 +395,64 @@ public void onBreak(BlockBreakEvent e) {
         int jagged = getConfig().getInt("rift.jagged", 2);
 
         riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
+int minY = w.getMinHeight() + 1;
 
-        for (int dz = -length / 2; dz <= length / 2; dz++) {
-            int localShift = ThreadLocalRandom.current().nextInt(-jagged, jagged + 1);
+// "Змейка" трещины: непрерывная ломаная линия по X при движении по Z
+int maxOffset = Math.max(2, halfWidth + 2); // насколько далеко трещина может уйти от cx
+int pathX = cx;
+int drift = 0;
 
-            for (int y = topY; y >= minY; y--) {
-                int dynamicHalfWidth = halfWidth + ((y % 7 == 0) ? 1 : 0);
+for (int dz = -length / 2; dz <= length / 2; dz++) {
+    // Плавное изменение направления
+    if (ThreadLocalRandom.current().nextInt(100) < 22) {
+        drift += ThreadLocalRandom.current().nextInt(-1, 2); // -1..1
+        drift = Math.max(-1, Math.min(1, drift));
+    }
 
-                for (int dx = -dynamicHalfWidth; dx <= dynamicHalfWidth; dx++) {
-                    int x = cx + dx + localShift;
-                    int z = cz + dz;
+    // Редкие "изломы" (как естественная трещина)
+    if (ThreadLocalRandom.current().nextInt(100) < 8) {
+        pathX += ThreadLocalRandom.current().nextInt(-1, 2);
+    }
 
-                    Block b = w.getBlockAt(x, y, z);
-                    rememberBlock(b);
-                    b.setType(Material.AIR, false);
-                    if (y == topY) {
-    for (int ay = topY + 1; ay <= w.getMaxHeight() - 1; ay++) {
-        Block above = w.getBlockAt(x, ay, z);
-        if (above.getType() != Material.AIR) {
-            rememberBlock(above);
-            above.setType(Material.AIR, false);
+    pathX += drift;
+    pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+
+    int z = cz + dz;
+
+    // Уже и стабильнее для маленьких размеров
+    int localHalf = halfWidth;
+    if (halfWidth <= 2) {
+        // для small делаем аккуратно: в основном 1-2 блока полуширины
+        localHalf = Math.max(1, halfWidth + (ThreadLocalRandom.current().nextInt(100) < 20 ? -1 : 0));
+    } else {
+        // для больших размеров немного вариативности
+        localHalf = Math.max(1, halfWidth + ThreadLocalRandom.current().nextInt(-1, 2));
+    }
+
+    int x1 = pathX - localHalf;
+    int x2 = pathX + localHalf;
+
+    // Прорезаем до бедрока
+    for (int x = x1; x <= x2; x++) {
+        int surfaceY = w.getHighestBlockYAt(x, z);
+
+        // Лёгкая неровность кромки сверху, но без жести
+        int cutTop = Math.min(topY, surfaceY) - ThreadLocalRandom.current().nextInt(0, 2);
+
+        for (int y = cutTop; y >= minY; y--) {
+            Block b = w.getBlockAt(x, y, z);
+            Material m = b.getType();
+            if (m == Material.BEDROCK) continue;
+            if (m != Material.AIR) rememberBlock(b);
+            b.setType(Material.AIR, false);
         }
     }
+
+    // Декор боковых кромок от фактической оси трещины
+    decorateEdge(w.getBlockAt(x1 - 1, topY, z), topY, minY);
+    decorateEdge(w.getBlockAt(x2 + 1, topY, z), topY, minY);
 }
+ 
                 }
 
                 int edgeX1 = cx - dynamicHalfWidth - 1 + localShift;
