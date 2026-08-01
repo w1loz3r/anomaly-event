@@ -404,9 +404,16 @@ private void buildRiftToBedrock(World w) {
 
     riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
     int minY = w.getMinHeight() + 1;
+    int maxOffset = Math.max(2, halfWidth + 2);
+int pathX = cx;
+int drift = 0;
 
-    // ... дальше твой текущий код метода без изменений
-}
+for (int dz = -length / 2; dz <= length / 2; dz++) {
+    if (ThreadLocalRandom.current().nextInt(100) < 22) {
+        drift += ThreadLocalRandom.current().nextInt(-1, 2);
+        drift = Math.max(-1, Math.min(1, drift));
+    }
+
 
         // Редкие "изломы"
         if (ThreadLocalRandom.current().nextInt(100) < 8) {
