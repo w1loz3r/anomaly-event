@@ -284,6 +284,8 @@ public void onBreak(BlockBreakEvent e) {
     if (riftCenter == null) return;
     if (!e.getBlock().getWorld().equals(riftCenter.getWorld())) return;
 
+    if (e.getPlayer().isOp()) return;
+
     int cx = riftCenter.getBlockX();
     int cz = riftCenter.getBlockZ();
 
