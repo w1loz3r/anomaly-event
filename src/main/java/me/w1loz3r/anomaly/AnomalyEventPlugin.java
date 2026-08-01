@@ -1,5 +1,6 @@
 package me.w1loz3r.anomaly;
 
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
@@ -277,7 +278,27 @@ public void onMove(PlayerMoveEvent e) {
         p.sendMessage("§5[Аномалия] §dТебя выбросило из разлома.");
     }
 }
+@EventHandler
+public void onBreak(BlockBreakEvent e) {
+    if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
+    if (riftCenter == null) return;
+    if (!e.getBlock().getWorld().equals(riftCenter.getWorld())) return;
 
+    int cx = riftCenter.getBlockX();
+    int cz = riftCenter.getBlockZ();
+
+    int length = getConfig().getInt("rift.length", 22);
+    int halfWidth = getConfig().getInt("rift.half-width", 2);
+    int pad = getConfig().getInt("rift.protect-padding", 3);
+
+    boolean inZ = Math.abs(e.getBlock().getZ() - cz) <= (length / 2 + pad);
+    boolean inX = Math.abs(e.getBlock().getX() - cx) <= (halfWidth + 1 + pad);
+
+    if (inZ && inX) {
+        e.setCancelled(true);
+        e.getPlayer().sendMessage("§cВ зоне разлома нельзя ломать блоки.");
+    }
+}
     private void help(CommandSender s) {
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
