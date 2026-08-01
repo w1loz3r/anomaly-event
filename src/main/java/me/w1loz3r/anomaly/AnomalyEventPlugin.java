@@ -7,6 +7,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -41,7 +43,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             Bukkit.getScheduler().runTask(this, this::enableAnomaly);
         }
 
-        getLogger().info("AnomalyEvent v2.3 enabled.");
+        getLogger().info("AnomalyEvent v2.5 enabled.");
     }
 
     @Override
@@ -49,7 +51,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         stopTasks();
         clearPlayerEffects();
         saveRiftState();
-        getLogger().info("AnomalyEvent v2.3 disabled.");
+        getLogger().info("AnomalyEvent v2.5 disabled.");
     }
 
     @Override
@@ -93,9 +95,11 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§7fog: §f" + getConfig().getBoolean("effects.fog.enabled", true));
                 sender.sendMessage("§7fog-level: §f" + getConfig().getInt("effects.fog.level", 1));
                 sender.sendMessage("§7rift-built: §f" + riftBuilt);
+                sender.sendMessage("§7saved-blocks: §f" + changedBlocks.size());
                 sender.sendMessage("§7rift.length: §f" + getConfig().getInt("rift.length", 22));
                 sender.sendMessage("§7rift.half-width: §f" + getConfig().getInt("rift.half-width", 2));
-                sender.sendMessage("§7rift.jagged: §f" + getConfig().getInt("rift.jagged", 2));
+                sender.sendMessage("§7rift.bottom-half-width: §f" + getConfig().getInt("rift.bottom-half-width", 1));
+                sender.sendMessage("§7rift.shell-thickness: §f" + getConfig().getInt("rift.shell-thickness", 2));
                 return true;
             }
 
@@ -181,28 +185,33 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
                 if (args[1].equalsIgnoreCase("size")) {
                     if (args.length < 5) {
-                        sender.sendMessage("§e/anomaly rift size <length> <halfWidth> <jagged>");
+                        sender.sendMessage("§e/anomaly rift size <length> <halfWidthTop> <jagged>");
+                        sender.sendMessage("§7(jagged оставлен для совместимости, фактически не влияет в v2.5)");
                         return true;
                     }
-                    Integer length = tryParseInt(args[2]);
-                    Integer halfWidth = tryParseInt(args[3]);
-                    Integer jagged = tryParseInt(args[4]);
 
-                    if (length == null || halfWidth == null || jagged == null) {
+                    Integer length = tryParseInt(args[2]);
+                    Integer halfWidthTop = tryParseInt(args[3]);
+                    Integer jaggedCompat = tryParseInt(args[4]);
+
+                    if (length == null || halfWidthTop == null || jaggedCompat == null) {
                         sender.sendMessage("§cЧисла введены неверно.");
                         return true;
                     }
 
-                    if (length < 10 || length > 300 || halfWidth < 1 || halfWidth > 30 || jagged < 0 || jagged > 12) {
-                        sender.sendMessage("§cОграничения: length 10-300, halfWidth 1-30, jagged 0-12");
+                    if (length < 10 || length > 350 || halfWidthTop < 1 || halfWidthTop > 40 || jaggedCompat < 0 || jaggedCompat > 20) {
+                        sender.sendMessage("§cОграничения: length 10-350, halfWidthTop 1-40, jagged 0-20");
                         return true;
                     }
 
                     getConfig().set("rift.length", length);
-                    getConfig().set("rift.half-width", halfWidth);
-                    getConfig().set("rift.jagged", jagged);
-                    saveConfig();
+                    getConfig().set("rift.half-width", halfWidthTop);
+                    getConfig().set("rift.jagged", jaggedCompat); // совместимость
+                    // по умолчанию низ делаем уже
+                    int bottom = Math.max(1, halfWidthTop / 3);
+                    getConfig().set("rift.bottom-half-width", bottom);
 
+                    saveConfig();
                     sender.sendMessage("§aНовый размер сохранен. Примени: §e/anomaly rift rebuild");
                     return true;
                 }
@@ -260,8 +269,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int length = getConfig().getInt("rift.length", 22);
         int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-        boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 1);
-        boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 1);
+        boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 2);
+        boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 2);
 
         int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
         if (inZ && inX && to.getY() <= teleportY) {
@@ -272,6 +281,45 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    @EventHandler
+    public void onBreak(BlockBreakEvent e) {
+        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
+        if (riftCenter == null) return;
+
+        if (isProtectedRiftZone(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+            e.getPlayer().sendMessage("§cВ зоне разлома нельзя ломать блоки.");
+        }
+    }
+
+    @EventHandler
+    public void onPlace(BlockPlaceEvent e) {
+        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
+        if (riftCenter == null) return;
+
+        if (isProtectedRiftZone(e.getBlock().getLocation())) {
+            e.setCancelled(true);
+            e.getPlayer().sendMessage("§cВ зоне разлома нельзя ставить блоки.");
+        }
+    }
+
+    private boolean isProtectedRiftZone(Location loc) {
+        if (riftCenter == null || loc == null) return false;
+        if (!loc.getWorld().equals(riftCenter.getWorld())) return false;
+
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
+
+        int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
+        int protectPad = getConfig().getInt("rift.protect-padding", 4);
+
+        boolean inZ = Math.abs(loc.getBlockZ() - cz) <= (length / 2 + protectPad);
+        boolean inX = Math.abs(loc.getBlockX() - cx) <= (halfWidth + 3 + protectPad);
+
+        return inZ && inX;
+    }
+
     private void help(CommandSender s) {
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
@@ -279,7 +327,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         s.sendMessage("§e/anomaly fog <on|off|level 0-3>");
         s.sendMessage("§e/anomaly storm <on|off>");
         s.sendMessage("§e/anomaly night <on|off>");
-        s.sendMessage("§e/anomaly rift size <length> <halfWidth> <jagged>");
+        s.sendMessage("§e/anomaly rift size <length> <halfWidthTop> <jagged>");
         s.sendMessage("§e/anomaly rift rebuild");
     }
 
@@ -329,7 +377,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     private Location findSafeLocation(World w) {
         Location spawn = w.getSpawnLocation();
-        int x = spawn.getBlockX() + getConfig().getInt("safety.safe-offset-x", 6);
+        int x = spawn.getBlockX() + getConfig().getInt("safety.safe-offset-x", 8);
         int z = spawn.getBlockZ() + getConfig().getInt("safety.safe-offset-z", 0);
         int y = w.getHighestBlockYAt(x, z) + 1;
         return new Location(w, x + 0.5, y, z + 0.5, spawn.getYaw(), spawn.getPitch());
@@ -353,6 +401,12 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (enable) w.setTime(18000L);
     }
 
+    /**
+     * Стабильная детерминированная генерация:
+     * - без случайного смещения оси (рамка не "плывет")
+     * - плавное сужение к низу
+     * - чистка блоков над разломом
+     */
     private void buildRiftToBedrock(World w) {
         Location spawn = w.getSpawnLocation();
         int cx = spawn.getBlockX();
@@ -362,19 +416,22 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int topY = w.getHighestBlockYAt(cx, cz) + 1;
 
         int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-        int jagged = getConfig().getInt("rift.jagged", 2);
+        int halfWidthTop = getConfig().getInt("rift.half-width", 2);
+        int halfWidthBottom = Math.max(1, getConfig().getInt("rift.bottom-half-width", 1));
+        int shellThickness = getConfig().getInt("rift.shell-thickness", 2);
 
         riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
 
+        int height = Math.max(1, topY - minY);
+
         for (int dz = -length / 2; dz <= length / 2; dz++) {
-            int localShift = ThreadLocalRandom.current().nextInt(-jagged, jagged + 1);
-
             for (int y = topY; y >= minY; y--) {
-                int dynamicHalfWidth = halfWidth + ((y % 7 == 0) ? 1 : 0);
+                double t = (double) (topY - y) / (double) height; // 0..1
+                int currentHalfWidth = (int) Math.round(halfWidthTop * (1.0 - t) + halfWidthBottom * t);
 
-                for (int dx = -dynamicHalfWidth; dx <= dynamicHalfWidth; dx++) {
-                    int x = cx + dx + localShift;
+                // 1) Чистим внутренность разлома
+                for (int dx = -currentHalfWidth; dx <= currentHalfWidth; dx++) {
+                    int x = cx + dx;
                     int z = cz + dz;
 
                     Block b = w.getBlockAt(x, y, z);
@@ -382,39 +439,78 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     b.setType(Material.AIR, false);
                 }
 
-                int edgeX1 = cx - dynamicHalfWidth - 1 + localShift;
-                int edgeX2 = cx + dynamicHalfWidth + 1 + localShift;
+                // 2) Чистим все блоки НАД разломом
+                if (y == topY) {
+                    for (int dx = -currentHalfWidth; dx <= currentHalfWidth; dx++) {
+                        int x = cx + dx;
+                        int z = cz + dz;
+                        for (int ay = topY + 1; ay <= w.getMaxHeight() - 1; ay++) {
+                            Block above = w.getBlockAt(x, ay, z);
+                            if (above.getType() != Material.AIR) {
+                                rememberBlock(above);
+                                above.setType(Material.AIR, false);
+                            }
+                        }
+                    }
+                }
 
-                decorateEdge(w.getBlockAt(edgeX1, y, cz + dz), y, minY);
-                decorateEdge(w.getBlockAt(edgeX2, y, cz + dz), y, minY);
+                // 3) Стабильная красивая рамка
+                for (int s = 1; s <= shellThickness; s++) {
+                    int leftX = cx - currentHalfWidth - s;
+                    int rightX = cx + currentHalfWidth + s;
+
+                    decorateEdgeStable(w.getBlockAt(leftX, y, cz + dz), y, minY, s);
+                    decorateEdgeStable(w.getBlockAt(rightX, y, cz + dz), y, minY, s);
+                }
             }
+        }
+
+        // Верхний обод по всей длине
+        for (int dz = -length / 2; dz <= length / 2; dz++) {
+            int leftX = cx - halfWidthTop - 1;
+            int rightX = cx + halfWidthTop + 1;
+
+            setIfNeeded(w.getBlockAt(leftX, topY, cz + dz), Material.CRYING_OBSIDIAN);
+            setIfNeeded(w.getBlockAt(rightX, topY, cz + dz), Material.CRYING_OBSIDIAN);
+
+            setIfNeeded(w.getBlockAt(leftX - 1, topY, cz + dz), Material.POLISHED_BLACKSTONE_BRICKS);
+            setIfNeeded(w.getBlockAt(rightX + 1, topY, cz + dz), Material.POLISHED_BLACKSTONE_BRICKS);
         }
 
         Block core = w.getBlockAt(cx, topY - 1, cz);
         rememberBlock(core);
-        core.setType(Material.CRYING_OBSIDIAN, false);
+        core.setType(Material.RESPAWN_ANCHOR, false);
 
         w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
         riftBuilt = true;
     }
 
-    private void decorateEdge(Block b, int y, int minY) {
-        Material m;
-        int roll = ThreadLocalRandom.current().nextInt(100);
-
-        if (y <= minY + 8 && roll < 30) m = Material.LAVA;
-        else if (roll < 8) m = Material.SCULK;
-        else if (roll < 18) m = Material.CRYING_OBSIDIAN;
-        else if (roll < 55) m = Material.DEEPSLATE_TILES;
-        else m = Material.POLISHED_BLACKSTONE;
-
+    private void setIfNeeded(Block b, Material m) {
         rememberBlock(b);
         b.setType(m, false);
+    }
+
+    private void decorateEdgeStable(Block b, int y, int minY, int shellLayer) {
+        Material mat;
+        int depthFromBottom = y - minY;
+
+        if (depthFromBottom <= 8) {
+            mat = (shellLayer == 1) ? Material.CRYING_OBSIDIAN : Material.MAGMA_BLOCK;
+        } else if (depthFromBottom <= 20) {
+            mat = (shellLayer == 1) ? Material.POLISHED_BLACKSTONE_BRICKS : Material.DEEPSLATE_TILES;
+        } else {
+            mat = (shellLayer == 1) ? Material.DEEPSLATE_BRICKS : Material.POLISHED_BLACKSTONE;
+        }
+
+        rememberBlock(b);
+        b.setType(mat, false);
     }
 
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
             String[] p = e.getKey().split(":");
+            if (p.length != 3) continue;
+
             int x = Integer.parseInt(p[0]);
             int y = Integer.parseInt(p[1]);
             int z = Integer.parseInt(p[2]);
@@ -452,8 +548,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     double dz = p.getLocation().getZ() - cz;
                     double dist = Math.sqrt(dx * dx + dz * dz);
 
-                    double nearRadius = getConfig().getDouble("effects.fog.near-radius", 18.0);
-                    double midRadius  = getConfig().getDouble("effects.fog.mid-radius", 36.0);
+                    double nearRadius = getConfig().getDouble("effects.fog.near-radius", 20.0);
+                    double midRadius = getConfig().getDouble("effects.fog.mid-radius", 42.0);
 
                     if (dist <= nearRadius) finalFogLevel = 3;
                     else if (dist <= midRadius) finalFogLevel = Math.max(finalFogLevel, 2);
@@ -491,17 +587,17 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
             int length = getConfig().getInt("rift.length", 22);
             int halfWidth = getConfig().getInt("rift.half-width", 2);
-            int hazardExtra = getConfig().getInt("hazard.extra-radius", 3);
+            int hazardExtra = getConfig().getInt("hazard.extra-radius", 4);
 
             for (Player p : w.getPlayers()) {
                 Location l = p.getLocation();
 
                 boolean inZ = Math.abs(l.getBlockZ() - cz) <= (length / 2 + hazardExtra);
-                boolean nearX = Math.abs(l.getBlockX() - cx) <= (halfWidth + hazardExtra);
+                boolean nearX = Math.abs(l.getBlockX() - cx) <= (halfWidth + 3 + hazardExtra);
 
                 if (inZ && nearX) {
                     p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 50, 0, true, true, true));
-                    if (ThreadLocalRandom.current().nextInt(100) < 20) p.damage(1.0);
+                    if (ThreadLocalRandom.current().nextInt(100) < 25) p.damage(1.0);
                 }
             }
         }, 20L, period);
@@ -509,18 +605,43 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     private void spawnRiftParticles(World w) {
         int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
+
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
-        int y = w.getHighestBlockYAt(cx, cz);
+        int topY = w.getHighestBlockYAt(cx, cz);
 
-        for (int i = -length / 2; i <= length / 2; i += 2) {
-            double px = cx + ThreadLocalRandom.current().nextDouble(-1.8, 1.8);
-            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
-            double py = y + ThreadLocalRandom.current().nextDouble(0.2, 2.2);
+        // адаптивно под размеры
+        int step = (length >= 120) ? 1 : 2;
+        int centerBursts = Math.max(12, halfWidth * 4);
+        int sideBursts = Math.max(10, halfWidth * 3);
 
-            w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
-            w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
-            w.spawnParticle(Particle.SOUL, px, py, pz, 2, 0.1, 0.2, 0.1, 0.001);
+        for (int dz = -length / 2; dz <= length / 2; dz += step) {
+            for (int i = 0; i < centerBursts; i++) {
+                double px = cx + ThreadLocalRandom.current().nextDouble(-halfWidth * 0.7, halfWidth * 0.7);
+                double pz = cz + dz + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
+                double py = topY + ThreadLocalRandom.current().nextDouble(0.2, 2.8);
+
+                w.spawnParticle(Particle.PORTAL, px, py, pz, 1, 0, 0, 0, 0.02);
+                w.spawnParticle(Particle.SMOKE, px, py, pz, 1, 0, 0, 0, 0.001);
+                w.spawnParticle(Particle.SOUL, px, py, pz, 1, 0, 0, 0, 0.001);
+            }
+
+            double leftX = cx - halfWidth - 0.5;
+            double rightX = cx + halfWidth + 0.5;
+
+            for (int i = 0; i < sideBursts; i++) {
+                double py = topY + ThreadLocalRandom.current().nextDouble(0.1, 2.4);
+                double pz = cz + dz + ThreadLocalRandom.current().nextDouble(-0.35, 0.35);
+
+                w.spawnParticle(Particle.ENCHANT, leftX, py, pz, 1, 0, 0, 0, 0.01);
+                w.spawnParticle(Particle.ENCHANT, rightX, py, pz, 1, 0, 0, 0, 0.01);
+
+                if (ThreadLocalRandom.current().nextInt(100) < 35) {
+                    w.spawnParticle(Particle.REVERSE_PORTAL, leftX, py, pz, 1, 0, 0, 0, 0.02);
+                    w.spawnParticle(Particle.REVERSE_PORTAL, rightX, py, pz, 1, 0, 0, 0, 0.02);
+                }
+            }
         }
     }
 
@@ -595,7 +716,14 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     private void saveRiftState() {
         World w = targetWorld();
         if (w == null || riftCenter == null) return;
-        dataStore.save(changedBlocks, riftBuilt, w.getName(), riftCenter.getBlockX(), riftCenter.getBlockY(), riftCenter.getBlockZ());
+        dataStore.save(
+                changedBlocks,
+                riftBuilt,
+                w.getName(),
+                riftCenter.getBlockX(),
+                riftCenter.getBlockY(),
+                riftCenter.getBlockZ()
+        );
     }
 
     private void loadRiftState() {
@@ -620,19 +748,22 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         addDefault("rift.length", 22);
         addDefault("rift.half-width", 2);
-        addDefault("rift.jagged", 2);
+        addDefault("rift.bottom-half-width", 1);
+        addDefault("rift.jagged", 2); // только совместимость старых конфигов
+        addDefault("rift.shell-thickness", 2);
+        addDefault("rift.protect-padding", 4);
 
         addDefault("effects.refresh-ticks", 30);
         addDefault("effects.fog.enabled", true);
         addDefault("effects.fog.level", 1);
-        addDefault("effects.fog.near-radius", 18.0);
-        addDefault("effects.fog.mid-radius", 36.0);
+        addDefault("effects.fog.near-radius", 20.0);
+        addDefault("effects.fog.mid-radius", 42.0);
 
         addDefault("hazard.period-ticks", 40);
-        addDefault("hazard.extra-radius", 3);
+        addDefault("hazard.extra-radius", 4);
 
         addDefault("safety.teleport-min-y", 15);
-        addDefault("safety.safe-offset-x", 6);
+        addDefault("safety.safe-offset-x", 8);
         addDefault("safety.safe-offset-z", 0);
 
         getConfig().options().copyDefaults(true);
