@@ -415,7 +415,6 @@ private void buildRiftToBedrock(World w) {
             drift = Math.max(-1, Math.min(1, drift));
         }
 
-        // Редкие "изломы"
         if (ThreadLocalRandom.current().nextInt(100) < 8) {
             pathX += ThreadLocalRandom.current().nextInt(-1, 2);
         }
@@ -425,16 +424,14 @@ private void buildRiftToBedrock(World w) {
 
         int z = cz + dz;
 
-        // Шире ядро
-        int crackHalf = 1; // базово 3 блока
-        if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2; // часто 5
-        if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3; // иногда 7
+        int crackHalf = 1; // 3 блока
+        if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2; // 5 блоков
+        if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3; // 7 блоков
 
         int cx1 = pathX - crackHalf;
         int cx2 = pathX + crackHalf;
 
         for (int x = cx1; x <= cx2; x++) {
-            // Срезаем верхние слои гарантированно
             int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
 
             for (int y = startY; y >= minY; y--) {
@@ -449,7 +446,6 @@ private void buildRiftToBedrock(World w) {
                 }
             }
 
-            // Добивка "крышек" возле поверхности
             for (int y = topY + 4; y >= topY - 1; y--) {
                 Block cap = w.getBlockAt(x, y, z);
                 Material cm = cap.getType();
@@ -467,8 +463,9 @@ private void buildRiftToBedrock(World w) {
         decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
 
         for (int y = topY - 6; y >= minY + 2; y -= 3) {
-    decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
-    decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
+            decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
+            decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
+        }
     }
 
     Block core = w.getBlockAt(cx, topY - 1, cz);
@@ -477,9 +474,6 @@ private void buildRiftToBedrock(World w) {
 
     cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
     w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
-
-    // Если метода decorateRiftCaps нет в классе, оставляем закомментированным:
-    // decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
 
     riftBuilt = true;
 }
@@ -582,7 +576,6 @@ private void spawnRiftParticles(World w) {
         w.playSound(riftCenter, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.5f, 0.7f);
     }
 }
-
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
             String[] p = e.getKey().split(":");
@@ -677,24 +670,6 @@ private void spawnRiftParticles(World w) {
             }
         }, 20L, period);
     }
-
-    private void spawnRiftParticles(World w) {
-        int length = getConfig().getInt("rift.length", 22);
-        int cx = riftCenter.getBlockX();
-        int cz = riftCenter.getBlockZ();
-        int y = w.getHighestBlockYAt(cx, cz);
-
-        for (int i = -length / 2; i <= length / 2; i += 2) {
-            double px = cx + ThreadLocalRandom.current().nextDouble(-1.8, 1.8);
-            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
-            double py = y + ThreadLocalRandom.current().nextDouble(0.2, 2.2);
-
-            w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
-            w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
-            w.spawnParticle(Particle.SOUL, px, py, pz, 2, 0.1, 0.2, 0.1, 0.001);
-        }
-    }
-
     private void startWeatherLockTask(World w) {
         stopWeatherLockTask();
         weatherLockTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
