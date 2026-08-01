@@ -527,6 +527,28 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         }
     }
 
+    private void spawnRiftParticles(World w) {
+    if (riftCenter == null) return;
+
+    int length = getConfig().getInt("rift.length", 22);
+    int cx = riftCenter.getBlockX();
+    int cz = riftCenter.getBlockZ();
+    int y = riftCenter.getBlockY();
+
+    for (int i = -length / 2; i <= length / 2; i++) {
+        double px = cx + ThreadLocalRandom.current().nextDouble(-2.0, 2.0);
+        double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
+        double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
+
+        w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
+        w.spawnParticle(Particle.SOUL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.01);
+        w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
+
+        if (ThreadLocalRandom.current().nextInt(100) < 8) {
+            w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 2, 0.1, 0.15, 0.1, 0.02);
+        }
+    }
+}
     private void decorateEdge(Block b, int y, int minY) {
     Material cur = b.getType();
 
