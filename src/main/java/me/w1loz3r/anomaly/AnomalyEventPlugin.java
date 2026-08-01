@@ -455,21 +455,23 @@ private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int 
                 String n = m.name();
 
                 boolean isVegetation =
-                        n.endsWith("_LOG") ||
-                        n.endsWith("_WOOD") ||
-                        n.endsWith("_LEAVES") ||
-                        n.equals("VINE") ||
-                        n.equals("CAVE_VINES") ||
-                        n.equals("CAVE_VINES_PLANT") ||
-                        n.equals("TWISTING_VINES") ||
-                        n.equals("TWISTING_VINES_PLANT") ||
-                        n.equals("WEEPING_VINES") ||
-                        n.equals("WEEPING_VINES_PLANT") ||
-                        n.equals("BAMBOO") ||
-                        n.equals("BAMBOO_SAPLING") ||
-                        n.equals("MANGROVE_ROOTS") ||
-                        n.equals("MUDDY_MANGROVE_ROOTS") ||
-                        n.equals("CHERRY_LEAVES");
+        n.endsWith("_LOG") ||
+        n.endsWith("_WOOD") ||
+        n.endsWith("_LEAVES") ||
+        n.equals("VINE") ||
+        n.equals("CAVE_VINES") ||
+        n.equals("CAVE_VINES_PLANT") ||
+        n.equals("TWISTING_VINES") ||
+        n.equals("TWISTING_VINES_PLANT") ||
+        n.equals("WEEPING_VINES") ||
+        n.equals("WEEPING_VINES_PLANT") ||
+        n.equals("BAMBOO") ||
+        n.equals("BAMBOO_SAPLING") ||
+        n.equals("MANGROVE_ROOTS") ||
+        n.equals("MUDDY_MANGROVE_ROOTS") ||
+        n.equals("CHERRY_LEAVES") ||
+        n.equals("SNOW") ||
+        n.equals("SNOW_BLOCK");
 
                 if (isVegetation) {
                     rememberBlock(b);
