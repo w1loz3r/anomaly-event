@@ -404,16 +404,16 @@ private void buildRiftToBedrock(World w) {
 
     riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
     int minY = w.getMinHeight() + 1;
+
     int maxOffset = Math.max(2, halfWidth + 2);
-int pathX = cx;
-int drift = 0;
+    int pathX = cx;
+    int drift = 0;
 
-for (int dz = -length / 2; dz <= length / 2; dz++) {
-    if (ThreadLocalRandom.current().nextInt(100) < 22) {
-        drift += ThreadLocalRandom.current().nextInt(-1, 2);
-        drift = Math.max(-1, Math.min(1, drift));
-    }
-
+    for (int dz = -length / 2; dz <= length / 2; dz++) {
+        if (ThreadLocalRandom.current().nextInt(100) < 22) {
+            drift += ThreadLocalRandom.current().nextInt(-1, 2);
+            drift = Math.max(-1, Math.min(1, drift));
+        }
 
         // Редкие "изломы"
         if (ThreadLocalRandom.current().nextInt(100) < 8) {
@@ -424,62 +424,19 @@ for (int dz = -length / 2; dz <= length / 2; dz++) {
         pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
 
         int z = cz + dz;
-    // Узкое "ядро" трещины: 1 блок, иногда 2-3
-    int crackHalf = 0; // ширина 1 блок
-    if (ThreadLocalRandom.current().nextInt(100) < 18) crackHalf = 1; // иногда 3 блока
-    if (ThreadLocalRandom.current().nextInt(100) < 4)  crackHalf = 2; // редко 5 блоков
 
-    int cx1 = pathX - crackHalf;
-    int cx2 = pathX + crackHalf;
-    
-    // Режем вертикально, но НЕ сносим огромный верх
-    for (int x = cx1; x <= cx2; x++) {
-        int surfaceY = w.getHighestBlockYAt(x, z);
-        int cutTop = Math.min(topY, surfaceY); // без -rand
-        
-        for (int y = cutTop; y >= minY; y--) {
-            Block b = w.getBlockAt(x, y, z);
-            Material m = b.getType();
-            if (m == Material.BEDROCK) continue;
-            if (m != Material.AIR) rememberBlock(b);
-            b.setType(Material.AIR, false);
-    }
-}
+        // Узкое "ядро" трещины: 1 блок, иногда 2-3
+        int crackHalf = 0;
+        if (ThreadLocalRandom.current().nextInt(100) < 18) crackHalf = 1;
+        if (ThreadLocalRandom.current().nextInt(100) < 4)  crackHalf = 2;
 
-// Декор кромок только у узкой щели
-decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
-decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
-    
-       // Узкое "ядро" трещины: 1 блок, иногда 2-3
-    int crackHalf = 0; // ширина 1 блок
+        int cx1 = pathX - crackHalf;
+        int cx2 = pathX + crackHalf;
 
-    if (ThreadLocalRandom.current().nextInt(100) < 18) crackHalf = 1; // иногда 3 блока
-    if (ThreadLocalRandom.current().nextInt(100) < 4)  crackHalf = 2; // редко 5 блоков
-    int cx1 = pathX - crackHalf;
-    int cx2 = pathX + crackHalf;
-
-// Режем вертикально, но НЕ сносим огромный верх
-for (int x = cx1; x <= cx2; x++) {
-    int surfaceY = w.getHighestBlockYAt(x, z);
-    int cutTop = Math.min(topY, surfaceY); // без -rand
-
-    for (int y = cutTop; y >= minY; y--) {
-        Block b = w.getBlockAt(x, y, z);
-        Material m = b.getType();
-        if (m == Material.BEDROCK) continue;
-        if (m != Material.AIR) rememberBlock(b);
-        b.setType(Material.AIR, false);
-    }
-}
-
-// Декор кромок только у узкой щели
-decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
-decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
-
-        // Прорезаем до бедрока
-        for (int x = x1; x <= x2; x++) {
+        // Режем вертикально, но не сносим огромный верх
+        for (int x = cx1; x <= cx2; x++) {
             int surfaceY = w.getHighestBlockYAt(x, z);
-            int cutTop = Math.min(topY, surfaceY) - ThreadLocalRandom.current().nextInt(0, 2);
+            int cutTop = Math.min(topY, surfaceY);
 
             for (int y = cutTop; y >= minY; y--) {
                 Block b = w.getBlockAt(x, y, z);
@@ -490,9 +447,9 @@ decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
             }
         }
 
-        // Декор боковых кромок
-        decorateEdge(w.getBlockAt(x1 - 1, topY, z), topY, minY);
-        decorateEdge(w.getBlockAt(x2 + 1, topY, z), topY, minY);
+        // Декор кромок только у узкой щели
+        decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
+        decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
     }
 
     Block core = w.getBlockAt(cx, topY - 1, cz);
