@@ -465,6 +465,10 @@ private void buildRiftToBedrock(World w) {
 
         decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
         decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
+
+        for (int y = topY - 6; y >= minY + 2; y -= 3) {
+    decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
+    decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
     }
 
     Block core = w.getBlockAt(cx, topY - 1, cz);
@@ -526,19 +530,58 @@ private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int 
         }
     }
 }
-    private void decorateEdge(Block b, int y, int minY) {
-        Material m;
-        int roll = ThreadLocalRandom.current().nextInt(100);
+    private void decorateDepthEdge(Block b, int y, int minY) {
+    int roll = ThreadLocalRandom.current().nextInt(100);
+    Material m;
 
-        if (y <= minY + 8 && roll < 30) m = Material.LAVA;
-        else if (roll < 8) m = Material.SCULK;
-        else if (roll < 18) m = Material.CRYING_OBSIDIAN;
-        else if (roll < 55) m = Material.DEEPSLATE_TILES;
-        else m = Material.POLISHED_BLACKSTONE;
-
-        rememberBlock(b);
-        b.setType(m, false);
+    if (y <= minY + 12) {
+        if (roll < 45) m = Material.BLACKSTONE;
+        else if (roll < 75) m = Material.POLISHED_BLACKSTONE_BRICKS;
+        else if (roll < 90) m = Material.SCULK;
+        else m = Material.CRYING_OBSIDIAN;
+    } else {
+        if (roll < 35) m = Material.DEEPSLATE_BRICKS;
+        else if (roll < 65) m = Material.POLISHED_BLACKSTONE;
+        else if (roll < 85) m = Material.SCULK;
+        else m = Material.CRYING_OBSIDIAN;
     }
+
+    rememberBlock(b);
+    b.setType(m, false);
+}
+
+private void spawnRiftParticles(World w) {
+    if (riftCenter == null) return;
+
+    int length = getConfig().getInt("rift.length", 22);
+    int cx = riftCenter.getBlockX();
+    int cz = riftCenter.getBlockZ();
+    int y = riftCenter.getBlockY();
+
+    for (int i = -length / 2; i <= length / 2; i++) {
+        double px = cx + ThreadLocalRandom.current().nextDouble(-2.2, 2.2);
+        double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
+        double py = y + ThreadLocalRandom.current().nextDouble(-1.5, 3.0);
+
+        w.spawnParticle(Particle.PORTAL, px, py, pz, 8, 0.25, 0.35, 0.25, 0.03);
+        w.spawnParticle(Particle.SOUL, px, py, pz, 4, 0.2, 0.3, 0.2, 0.01);
+        w.spawnParticle(Particle.SMOKE, px, py, pz, 5, 0.2, 0.25, 0.2, 0.002);
+
+        if (ThreadLocalRandom.current().nextInt(100) < 12) {
+            w.spawnParticle(Particle.SCULK_SOUL, px, py - 0.4, pz, 2, 0.1, 0.1, 0.1, 0.0);
+        }
+        if (ThreadLocalRandom.current().nextInt(100) < 8) {
+            w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.02);
+        }
+    }
+
+    if (ThreadLocalRandom.current().nextInt(100) < 10) {
+        w.playSound(riftCenter, Sound.AMBIENT_SOUL_SAND_VALLEY_MOOD, 0.8f, 0.6f);
+    }
+    if (ThreadLocalRandom.current().nextInt(100) < 6) {
+        w.playSound(riftCenter, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.5f, 0.7f);
+    }
+}
 
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
