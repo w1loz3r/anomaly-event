@@ -425,29 +425,41 @@ private void buildRiftToBedrock(World w) {
 
         int z = cz + dz;
 
-        // Узкое "ядро" трещины: 1 блок, иногда 2-3
-        int crackHalf = 0;
-        if (ThreadLocalRandom.current().nextInt(100) < 18) crackHalf = 1;
-        if (ThreadLocalRandom.current().nextInt(100) < 4)  crackHalf = 2;
+        // Шире ядро
+        int crackHalf = 1; // базово 3 блока
+        if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2; // часто 5
+        if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3; // иногда 7
 
         int cx1 = pathX - crackHalf;
         int cx2 = pathX + crackHalf;
 
-        // Режем вертикально, но не сносим огромный верх
         for (int x = cx1; x <= cx2; x++) {
-            int surfaceY = w.getHighestBlockYAt(x, z);
-            int cutTop = Math.min(topY, surfaceY);
+            // Срезаем верхние слои (снег/трава/слои) гарантированно
+            int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
 
-            for (int y = cutTop; y >= minY; y--) {
+            for (int y = startY; y >= minY; y--) {
                 Block b = w.getBlockAt(x, y, z);
                 Material m = b.getType();
+
                 if (m == Material.BEDROCK) continue;
-                if (m != Material.AIR) rememberBlock(b);
-                b.setType(Material.AIR, false);
+
+                if (m != Material.AIR) {
+                    rememberBlock(b);
+                    b.setType(Material.AIR, false);
+                }
+            }
+
+            // Добивка "крышек" возле поверхности
+            for (int y = topY + 4; y >= topY - 1; y--) {
+                Block cap = w.getBlockAt(x, y, z);
+                Material cm = cap.getType();
+                if (cm == Material.SNOW || cm == Material.TALL_GRASS || cm == Material.GRASS) {
+                    rememberBlock(cap);
+                    cap.setType(Material.AIR, false);
+                }
             }
         }
 
-        // Декор кромок только у узкой щели
         decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
         decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
     }
@@ -461,37 +473,6 @@ private void buildRiftToBedrock(World w) {
     decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
 
     riftBuilt = true;
-}
-private void decorateRiftCaps(World w, int cx, int cz, int topY, int length, int halfWidth) {
-    int zMin = cz - (length / 2);
-    int zMax = cz + (length / 2);
-
-    // Толщина декора торца (в блоках)
-    int capDepth = 2;
-
-    // Декорируем оба торца: северный и южный
-    for (int x = cx - (halfWidth + 1); x <= cx + (halfWidth + 1); x++) {
-        for (int d = 0; d <= capDepth; d++) {
-            int zNorth = zMin - d;
-            int zSouth = zMax + d;
-
-            // Небольшая "зубчатость", чтобы выглядело естественнее
-            int localTop = topY - ThreadLocalRandom.current().nextInt(0, 2);
-
-            for (int y = localTop; y >= w.getMinHeight() + 1; y--) {
-                Block bn = w.getBlockAt(x, y, zNorth);
-                Block bs = w.getBlockAt(x, y, zSouth);
-
-                // Только если это контакт с пустотой разлома или рядом с ней
-                if (bn.getType() != Material.AIR) {
-                    decorateEdge(bn, y, w.getMinHeight() + 1);
-                }
-                if (bs.getType() != Material.AIR) {
-                    decorateEdge(bs, y, w.getMinHeight() + 1);
-                }
-            }
-        }
-    }
 }
 private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
     int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
