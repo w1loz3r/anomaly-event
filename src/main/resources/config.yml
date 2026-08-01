@@ -1,12 +1,28 @@
 world: world
 
-effects:
-  fog:
-    enabled: false
-    refresh-ticks: 40
-    use-weakness: true
-
 state:
   anomaly-enabled: false
-  storm-enabled: false
-  long-night-enabled: false
+  storm-enabled: true
+  night-enabled: true
+
+rift:
+  length: 22
+  half-width: 2
+  jagged: 2
+
+effects:
+  refresh-ticks: 30
+  fog:
+    enabled: true
+    level: 1
+    near-radius: 18.0
+    mid-radius: 36.0
+
+hazard:
+  period-ticks: 40
+  extra-radius: 3
+
+safety:
+  teleport-min-y: 15
+  safe-offset-x: 6
+  safe-offset-z: 0
