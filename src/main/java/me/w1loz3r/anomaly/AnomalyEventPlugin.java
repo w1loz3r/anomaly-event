@@ -376,101 +376,109 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void buildRiftToBedrock(World w) {
-        int cx;
-        int cz;
+    int cx;
+    int cz;
 
-        if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
-            cx = getConfig().getInt("rift.center-x");
-            cz = getConfig().getInt("rift.center-z");
-        } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
-            cx = riftCenter.getBlockX();
-            cz = riftCenter.getBlockZ();
-        } else {
-            Location sp = w.getSpawnLocation();
-            cx = sp.getBlockX();
-            cz = sp.getBlockZ();
-        }
-
-        int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-
-        riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
-        int minY = w.getMinHeight() + 1;
-
-        int maxOffset = Math.max(2, halfWidth + 2);
-        int pathX = cx;
-        int drift = 0;
-
-        for (int dz = -length / 2; dz <= length / 2; dz++) {
-            if (ThreadLocalRandom.current().nextInt(100) < 22) {
-                drift += ThreadLocalRandom.current().nextInt(-1, 2);
-                drift = Math.max(-1, Math.min(1, drift));
-            }
-
-            if (ThreadLocalRandom.current().nextInt(100) < 8) {
-                pathX += ThreadLocalRandom.current().nextInt(-1, 2);
-            }
-
-            pathX += drift;
-            pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
-
-            int z = cz + dz;
-
-            int crackHalf = 1;
-            if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2;
-            if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3;
-
-            int cx1 = pathX - crackHalf;
-            int cx2 = pathX + crackHalf;
-
-            for (int x = cx1; x <= cx2; x++) {
-                int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
-
-                for (int y = startY; y >= minY; y--) {
-                    Block b = w.getBlockAt(x, y, z);
-                    Material m = b.getType();
-
-                    if (m == Material.BEDROCK) continue;
-
-                    if (m != Material.AIR) {
-                        rememberBlock(b);
-                        b.setType(Material.AIR, false);
-                    }
-                }
-
-                for (int y = topY + 4; y >= topY - 1; y--) {
-                    Block cap = w.getBlockAt(x, y, z);
-                    Material cm = cap.getType();
-                    if (cm == Material.SNOW
-                            || cm == Material.SNOW_BLOCK
-                            || cm == Material.TALL_GRASS
-                            || cm == Material.SHORT_GRASS) {
-                        rememberBlock(cap);
-                        cap.setType(Material.AIR, false);
-                    }
-                }
-            }
-
-            decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
-            decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
-
-            for (int y = topY - 6; y >= minY + 2; y -= 3) {
-                decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
-            }
-        }
-
-        Block core = w.getBlockAt(cx, topY - 1, cz);
-        rememberBlock(core);
-        core.setType(Material.CRYING_OBSIDIAN, false);
-
-        cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
-        w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
-
-        riftBuilt = true;
+    if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
+        cx = getConfig().getInt("rift.center-x");
+        cz = getConfig().getInt("rift.center-z");
+    } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
+        cx = riftCenter.getBlockX();
+        cz = riftCenter.getBlockZ();
+    } else {
+        Location sp = w.getSpawnLocation();
+        cx = sp.getBlockX();
+        cz = sp.getBlockZ();
     }
 
+    int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
+    int length = getConfig().getInt("rift.length", 22);
+    int halfWidth = getConfig().getInt("rift.half-width", 2);
+
+    riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
+    int minY = w.getMinHeight() + 1;
+
+    int maxOffset = Math.max(2, halfWidth + 2);
+    int pathX = cx;
+    int drift = 0;
+
+    for (int dz = -length / 2; dz <= length / 2; dz++) {
+        if (ThreadLocalRandom.current().nextInt(100) < 22) {
+            drift += ThreadLocalRandom.current().nextInt(-1, 2);
+            drift = Math.max(-1, Math.min(1, drift));
+        }
+
+        if (ThreadLocalRandom.current().nextInt(100) < 8) {
+            pathX += ThreadLocalRandom.current().nextInt(-1, 2);
+        }
+
+        pathX += drift;
+        pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+
+        int z = cz + dz;
+
+        int crackHalf = 1; // 3 блока
+        if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2; // 5
+        if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3; // 7
+
+        int cx1 = pathX - crackHalf;
+        int cx2 = pathX + crackHalf;
+
+        // Основной прорез
+        for (int x = cx1; x <= cx2; x++) {
+            int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
+
+            for (int y = startY; y >= minY; y--) {
+                Block b = w.getBlockAt(x, y, z);
+                Material m = b.getType();
+
+                if (m == Material.BEDROCK) continue;
+                if (m != Material.AIR) {
+                    rememberBlock(b);
+                    b.setType(Material.AIR, false);
+                }
+            }
+
+            // чистка поверхностного мусора
+            for (int y = topY + 4; y >= topY - 1; y--) {
+                Block cap = w.getBlockAt(x, y, z);
+                Material cm = cap.getType();
+                if (cm == Material.SNOW
+                        || cm == Material.SNOW_BLOCK
+                        || cm == Material.TALL_GRASS
+                        || cm == Material.SHORT_GRASS) {
+                    rememberBlock(cap);
+                    cap.setType(Material.AIR, false);
+                }
+            }
+        }
+
+        // Декор края у поверхности
+        decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
+        decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
+
+        // Декор стен по всем уровням
+        for (int y = topY - 2; y >= minY + 1; y--) {
+            decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
+            decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
+
+            // второй пояс (плотность)
+            if (ThreadLocalRandom.current().nextInt(100) < 55) {
+                decorateDepthEdge(w.getBlockAt(cx1 - 2, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(cx2 + 2, y, z), y, minY);
+            }
+        }
+    }
+
+    Block core = w.getBlockAt(cx, topY - 1, cz);
+    rememberBlock(core);
+    core.setType(Material.CRYING_OBSIDIAN, false);
+
+    cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
+    w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
+
+    riftBuilt = true;
+}
     private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
         int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
         int up = getConfig().getInt("rift.cleanup-up", 20);
@@ -520,79 +528,63 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void decorateEdge(Block b, int y, int minY) {
-    if (b.getType() != Material.AIR) return; // не затираем существующие блоки
+    Material cur = b.getType();
 
-    Block support = b.getRelative(0, -1, 0);
-    if (support.getType() == Material.AIR) return; // нет опоры -> не ставим "висяк"
+    // Только реальная стенка
+    if (cur == Material.AIR || cur == Material.BEDROCK || cur == Material.WATER || cur == Material.LAVA) return;
 
     int roll = ThreadLocalRandom.current().nextInt(100);
     Material m;
 
-    if (y <= minY + 8 && roll < 22) m = Material.LAVA;
-    else if (roll < 10) m = Material.SCULK;
-    else if (roll < 22) m = Material.CRYING_OBSIDIAN;
-    else if (roll < 60) m = Material.DEEPSLATE_TILES;
+    if (y <= minY + 8 && roll < 25) m = Material.LAVA;
+    else if (roll < 12) m = Material.SCULK;
+    else if (roll < 24) m = Material.CRYING_OBSIDIAN;
+    else if (roll < 62) m = Material.DEEPSLATE_TILES;
     else m = Material.POLISHED_BLACKSTONE;
 
+    if (cur == m) return;
     rememberBlock(b);
     b.setType(m, false);
 }
 
 private void decorateDepthEdge(Block b, int y, int minY) {
-    if (b.getType() != Material.AIR) return; // не заменяем существующее
-    Block support = b.getRelative(0, -1, 0);
-    if (support.getType() == Material.AIR) return; // без опоры не ставим
+    Material cur = b.getType();
+
+    // Меняем только стену
+    if (cur == Material.AIR || cur == Material.BEDROCK || cur == Material.LAVA || cur == Material.WATER) return;
 
     int roll = ThreadLocalRandom.current().nextInt(100);
     Material m;
 
+    // Нижний слой
     if (y <= minY + 12) {
-        if (roll < 45) m = Material.BLACKSTONE;
-        else if (roll < 75) m = Material.POLISHED_BLACKSTONE_BRICKS;
-        else if (roll < 90) m = Material.SCULK;
-        else m = Material.CRYING_OBSIDIAN;
-    } else {
-        if (roll < 35) m = Material.DEEPSLATE_BRICKS;
-        else if (roll < 65) m = Material.POLISHED_BLACKSTONE;
+        if (roll < 40) m = Material.BLACKSTONE;
+        else if (roll < 70) m = Material.POLISHED_BLACKSTONE_BRICKS;
         else if (roll < 85) m = Material.SCULK;
+        else if (roll < 95) m = Material.CRYING_OBSIDIAN;
+        else m = Material.MAGMA_BLOCK;
+    }
+    // Средний слой
+    else if (y <= minY + 35) {
+        if (roll < 35) m = Material.DEEPSLATE_BRICKS;
+        else if (roll < 60) m = Material.DEEPSLATE_TILES;
+        else if (roll < 80) m = Material.POLISHED_BLACKSTONE;
+        else if (roll < 92) m = Material.SCULK;
+        else m = Material.CRYING_OBSIDIAN;
+    }
+    // Верхний слой
+    else {
+        if (roll < 45) m = Material.DEEPSLATE;
+        else if (roll < 70) m = Material.COBBLED_DEEPSLATE;
+        else if (roll < 85) m = Material.DEEPSLATE_TILES;
+        else if (roll < 95) m = Material.POLISHED_BLACKSTONE;
         else m = Material.CRYING_OBSIDIAN;
     }
 
+    if (cur == m) return;
     rememberBlock(b);
     b.setType(m, false);
 }
-    private void spawnRiftParticles(World w) {
-        if (riftCenter == null) return;
-
-        int length = getConfig().getInt("rift.length", 22);
-        int cx = riftCenter.getBlockX();
-        int cz = riftCenter.getBlockZ();
-        int y = riftCenter.getBlockY();
-
-        for (int i = -length / 2; i <= length / 2; i++) {
-            double px = cx + ThreadLocalRandom.current().nextDouble(-2.2, 2.2);
-            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
-            double py = y + ThreadLocalRandom.current().nextDouble(-1.5, 3.0);
-
-            w.spawnParticle(Particle.PORTAL, px, py, pz, 8, 0.25, 0.35, 0.25, 0.03);
-            w.spawnParticle(Particle.SOUL, px, py, pz, 4, 0.2, 0.3, 0.2, 0.01);
-            w.spawnParticle(Particle.SMOKE, px, py, pz, 5, 0.2, 0.25, 0.2, 0.002);
-
-            if (ThreadLocalRandom.current().nextInt(100) < 12) {
-                w.spawnParticle(Particle.SCULK_SOUL, px, py - 0.4, pz, 2, 0.1, 0.1, 0.1, 0.0);
-            }
-            if (ThreadLocalRandom.current().nextInt(100) < 8) {
-                w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.02);
-            }
-        }
-
-        if (ThreadLocalRandom.current().nextInt(100) < 10) {
-            w.playSound(riftCenter, Sound.AMBIENT_SOUL_SAND_VALLEY_MOOD, 0.8f, 0.6f);
-        }
-        if (ThreadLocalRandom.current().nextInt(100) < 6) {
-            w.playSound(riftCenter, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.5f, 0.7f);
-        }
-    }
 
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
