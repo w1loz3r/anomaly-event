@@ -1,3 +1,4 @@
+```java name=src/main/java/me/w1loz3r/anomaly/AnomalyEventPlugin.java
 package me.w1loz3r.anomaly;
 
 import org.bukkit.*;
@@ -7,16 +8,12 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
@@ -35,8 +32,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         applyDefaultsIfMissing();
-
         dataStore = new RiftDataStore(this);
+
         Bukkit.getPluginManager().registerEvents(this, this);
 
         loadRiftState();
@@ -45,7 +42,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             Bukkit.getScheduler().runTask(this, this::enableAnomaly);
         }
 
-        getLogger().info("AnomalyEvent fixed build enabled.");
+        getLogger().info("AnomalyEvent v2.2 enabled.");
     }
 
     @Override
@@ -53,7 +50,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         stopTasks();
         clearPlayerEffects();
         saveRiftState();
-        getLogger().info("AnomalyEvent fixed build disabled.");
+        getLogger().info("AnomalyEvent v2.2 disabled.");
     }
 
     @Override
@@ -79,6 +76,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§aАномалия включена.");
                 return true;
             }
+
             case "off" -> {
                 getConfig().set("state.anomaly-enabled", false);
                 saveConfig();
@@ -87,27 +85,34 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§aАномалия выключена.");
                 return true;
             }
+
             case "status" -> {
                 sender.sendMessage("§7=== §dAnomaly Status §7===");
                 sender.sendMessage("§7enabled: §f" + getConfig().getBoolean("state.anomaly-enabled", false));
                 sender.sendMessage("§7storm: §f" + getConfig().getBoolean("state.storm-enabled", true));
                 sender.sendMessage("§7night: §f" + getConfig().getBoolean("state.night-enabled", true));
                 sender.sendMessage("§7fog: §f" + getConfig().getBoolean("effects.fog.enabled", true));
-                sender.sendMessage("§7fog-level: §f" + getConfig().getInt("effects.fog.level", 1));
+                sender.sendMessage("§7fog-level: §f" + getConfig().getInt("effects.fog.level", 2));
                 sender.sendMessage("§7rift-built: §f" + riftBuilt);
+                sender.sendMessage("§7rift.length: §f" + getConfig().getInt("rift.length", 22));
+                sender.sendMessage("§7rift.half-width: §f" + getConfig().getInt("rift.half-width", 2));
+                sender.sendMessage("§7rift.jagged: §f" + getConfig().getInt("rift.jagged", 2));
                 return true;
             }
+
             case "fog" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
                     return true;
                 }
+
                 if (args[1].equalsIgnoreCase("on")) {
                     getConfig().set("effects.fog.enabled", true);
                     saveConfig();
                     sender.sendMessage("§aТуман включен.");
                     return true;
                 }
+
                 if (args[1].equalsIgnoreCase("off")) {
                     getConfig().set("effects.fog.enabled", false);
                     saveConfig();
@@ -115,6 +120,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     sender.sendMessage("§aТуман выключен.");
                     return true;
                 }
+
                 if (args[1].equalsIgnoreCase("level")) {
                     if (args.length < 3) {
                         sender.sendMessage("§e/anomaly fog level <0-3>");
@@ -131,9 +137,11 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     sender.sendMessage("§aУровень тумана: " + lvl);
                     return true;
                 }
+
                 sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
                 return true;
             }
+
             case "storm" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly storm <on|off>");
@@ -149,6 +157,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aГроза включена." : "§aГроза выключена.");
                 return true;
             }
+
             case "night" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly night <on|off>");
@@ -164,6 +173,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aНочь зафиксирована." : "§aЦикл дня восстановлен.");
                 return true;
             }
+
             case "rift" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly rift <size|rebuild>");
@@ -175,7 +185,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                         sender.sendMessage("§e/anomaly rift size <length> <halfWidth> <jagged>");
                         return true;
                     }
-
                     Integer length = tryParseInt(args[2]);
                     Integer halfWidth = tryParseInt(args[3]);
                     Integer jagged = tryParseInt(args[4]);
@@ -226,6 +235,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§e/anomaly rift <size|rebuild>");
                 return true;
             }
+
             default -> {
                 help(sender);
                 return true;
@@ -263,45 +273,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         }
     }
 
-    @EventHandler
-    public void onBreak(BlockBreakEvent e) {
-        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
-        if (riftCenter == null) return;
-        if (!e.getBlock().getWorld().equals(riftCenter.getWorld())) return;
-
-        if (isProtectedRiftZone(e.getBlock().getLocation())) {
-            e.setCancelled(true);
-            e.getPlayer().sendMessage("§cВ зоне разлома нельзя ломать блоки.");
-        }
-    }
-
-    @EventHandler
-    public void onPlace(BlockPlaceEvent e) {
-        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
-        if (riftCenter == null) return;
-        if (!e.getBlock().getWorld().equals(riftCenter.getWorld())) return;
-
-        if (isProtectedRiftZone(e.getBlock().getLocation())) {
-            e.setCancelled(true);
-            e.getPlayer().sendMessage("§cВ зоне разлома нельзя ставить блоки.");
-        }
-    }
-
-    private boolean isProtectedRiftZone(Location loc) {
-        if (riftCenter == null) return false;
-
-        int cx = riftCenter.getBlockX();
-        int cz = riftCenter.getBlockZ();
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-        int pad = getConfig().getInt("rift.protect-padding", 3);
-
-        boolean inZ = Math.abs(loc.getBlockZ() - cz) <= (length / 2 + pad);
-        boolean inX = Math.abs(loc.getBlockX() - cx) <= (halfWidth + 1 + pad);
-
-        return inZ && inX;
-    }
-
     private void help(CommandSender s) {
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
@@ -314,11 +285,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private Integer tryParseInt(String s) {
-        try {
-            return Integer.parseInt(s);
-        } catch (Exception ex) {
-            return null;
-        }
+        try { return Integer.parseInt(s); } catch (Exception ex) { return null; }
     }
 
     private void enableAnomaly() {
@@ -414,16 +381,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     Block b = w.getBlockAt(x, y, z);
                     rememberBlock(b);
                     b.setType(Material.AIR, false);
-
-                    if (y == topY) {
-                        for (int ay = topY + 1; ay <= w.getMaxHeight() - 1; ay++) {
-                            Block above = w.getBlockAt(x, ay, z);
-                            if (above.getType() != Material.AIR) {
-                                rememberBlock(above);
-                                above.setType(Material.AIR, false);
-                            }
-                        }
-                    }
                 }
 
                 int edgeX1 = cx - dynamicHalfWidth - 1 + localShift;
@@ -459,7 +416,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
             String[] p = e.getKey().split(":");
-            if (p.length != 3) continue;
             int x = Integer.parseInt(p[0]);
             int y = Integer.parseInt(p[1]);
             int z = Integer.parseInt(p[2]);
@@ -479,7 +435,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
 
             boolean fogEnabled = getConfig().getBoolean("effects.fog.enabled", true);
-            int baseFogLevel = getConfig().getInt("effects.fog.level", 1);
+            int baseFogLevel = getConfig().getInt("effects.fog.level", 2);
 
             int cx = (riftCenter != null) ? riftCenter.getBlockX() : 0;
             int cz = (riftCenter != null) ? riftCenter.getBlockZ() : 0;
@@ -554,29 +510,18 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     private void spawnRiftParticles(World w) {
         int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
         int y = w.getHighestBlockYAt(cx, cz);
 
-        int step = (length >= 120) ? 1 : 2;
-        int bursts = Math.max(10, halfWidth * 3);
+        for (int i = -length / 2; i <= length / 2; i += 2) {
+            double px = cx + ThreadLocalRandom.current().nextDouble(-1.8, 1.8);
+            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
+            double py = y + ThreadLocalRandom.current().nextDouble(0.2, 2.2);
 
-        for (int i = -length / 2; i <= length / 2; i += step) {
-            for (int n = 0; n < bursts; n++) {
-                double px = cx + ThreadLocalRandom.current().nextDouble(-(halfWidth + 0.8), (halfWidth + 0.8));
-                double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
-                double py = y + ThreadLocalRandom.current().nextDouble(0.2, 2.8);
-
-                w.spawnParticle(Particle.PORTAL, px, py, pz, 1, 0, 0, 0, 0.02);
-                w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 1, 0, 0, 0, 0.02);
-                w.spawnParticle(Particle.SMOKE, px, py, pz, 1, 0, 0, 0, 0.001);
-
-                if (ThreadLocalRandom.current().nextInt(100) < 40) {
-                    w.spawnParticle(Particle.SOUL, px, py, pz, 1, 0, 0, 0, 0.001);
-                }
-            }
+            w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
+            w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
+            w.spawnParticle(Particle.SOUL, px, py, pz, 2, 0.1, 0.2, 0.1, 0.001);
         }
     }
 
@@ -677,11 +622,10 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         addDefault("rift.length", 22);
         addDefault("rift.half-width", 2);
         addDefault("rift.jagged", 2);
-        addDefault("rift.protect-padding", 3);
 
         addDefault("effects.refresh-ticks", 30);
         addDefault("effects.fog.enabled", true);
-        addDefault("effects.fog.level", 1);
+        addDefault("effects.fog.level", 2);
         addDefault("effects.fog.near-radius", 18.0);
         addDefault("effects.fog.mid-radius", 36.0);
 
@@ -700,3 +644,4 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (!getConfig().isSet(path)) getConfig().set(path, value);
     }
 }
+```
