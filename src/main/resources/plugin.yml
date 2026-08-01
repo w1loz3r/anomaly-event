@@ -1,0 +1,17 @@
+name: AnomalyEvent
+version: 1.0.0
+main: me.w1loz3r.anomaly.AnomalyEventPlugin
+api-version: '1.21'
+authors: [w1loz3r]
+description: Rift/Anomaly event plugin with fog, storm and long night
+
+commands:
+  anomaly:
+    description: Control anomaly event
+    usage: /anomaly <on|off|storm|night|fog|status>
+    permission: anomaly.admin
+
+permissions:
+  anomaly.admin:
+    description: Full control of anomaly event
+    default: op
