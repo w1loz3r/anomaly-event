@@ -9,7 +9,7 @@ rift:
   length: 22
   half-width: 2
   jagged: 2
-
+addDefault("rift.protect-padding", 3);
 effects:
   refresh-ticks: 30
   fog:
