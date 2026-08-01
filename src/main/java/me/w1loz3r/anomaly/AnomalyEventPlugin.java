@@ -41,7 +41,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             Bukkit.getScheduler().runTask(this, this::enableAnomaly);
         }
 
-        getLogger().info("AnomalyEvent v2.2 enabled.");
+        getLogger().info("AnomalyEvent v2.3 enabled.");
     }
 
     @Override
@@ -49,7 +49,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         stopTasks();
         clearPlayerEffects();
         saveRiftState();
-        getLogger().info("AnomalyEvent v2.2 disabled.");
+        getLogger().info("AnomalyEvent v2.3 disabled.");
     }
 
     @Override
@@ -65,6 +65,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
+
         switch (sub) {
             case "on" -> {
                 getConfig().set("state.anomaly-enabled", true);
@@ -72,22 +73,173 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 enableAnomaly();
                 Bukkit.broadcastMessage("§5[Аномалия] §dРазлом открылся...");
                 sender.sendMessage("§aАномалия включена.");
+                return true;
             }
+
             case "off" -> {
                 getConfig().set("state.anomaly-enabled", false);
                 saveConfig();
                 disableAnomaly();
                 Bukkit.broadcastMessage("§5[Аномалия] §aРазлом закрыт.");
                 sender.sendMessage("§aАномалия выключена.");
+                return true;
             }
+
             case "status" -> {
-                sender.sendMessage("§7anomaly-enabled: §f" + getConfig().getBoolean("state.anomaly-enabled", false));
+                sender.sendMessage("§7=== §dAnomaly Status §7===");
+                sender.sendMessage("§7enabled: §f" + getConfig().getBoolean("state.anomaly-enabled", false));
+                sender.sendMessage("§7storm: §f" + getConfig().getBoolean("state.storm-enabled", true));
+                sender.sendMessage("§7night: §f" + getConfig().getBoolean("state.night-enabled", true));
+                sender.sendMessage("§7fog: §f" + getConfig().getBoolean("effects.fog.enabled", true));
+                sender.sendMessage("§7fog-level: §f" + getConfig().getInt("effects.fog.level", 1));
                 sender.sendMessage("§7rift-built: §f" + riftBuilt);
-                sender.sendMessage("§7saved-blocks: §f" + changedBlocks.size());
+                sender.sendMessage("§7rift.length: §f" + getConfig().getInt("rift.length", 22));
+                sender.sendMessage("§7rift.half-width: §f" + getConfig().getInt("rift.half-width", 2));
+                sender.sendMessage("§7rift.jagged: §f" + getConfig().getInt("rift.jagged", 2));
+                return true;
             }
-            default -> help(sender);
+
+            case "fog" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
+                    return true;
+                }
+
+                if (args[1].equalsIgnoreCase("on")) {
+                    getConfig().set("effects.fog.enabled", true);
+                    saveConfig();
+                    sender.sendMessage("§aТуман включен.");
+                    return true;
+                }
+
+                if (args[1].equalsIgnoreCase("off")) {
+                    getConfig().set("effects.fog.enabled", false);
+                    saveConfig();
+                    clearFogOnly();
+                    sender.sendMessage("§aТуман выключен.");
+                    return true;
+                }
+
+                if (args[1].equalsIgnoreCase("level")) {
+                    if (args.length < 3) {
+                        sender.sendMessage("§e/anomaly fog level <0-3>");
+                        return true;
+                    }
+                    Integer lvl = tryParseInt(args[2]);
+                    if (lvl == null || lvl < 0 || lvl > 3) {
+                        sender.sendMessage("§cУровень должен быть от 0 до 3.");
+                        return true;
+                    }
+                    getConfig().set("effects.fog.level", lvl);
+                    getConfig().set("effects.fog.enabled", lvl > 0);
+                    saveConfig();
+                    sender.sendMessage("§aУровень тумана: " + lvl);
+                    return true;
+                }
+
+                sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
+                return true;
+            }
+
+            case "storm" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§e/anomaly storm <on|off>");
+                    return true;
+                }
+                boolean on = args[1].equalsIgnoreCase("on");
+                getConfig().set("state.storm-enabled", on);
+                saveConfig();
+
+                World w = targetWorld();
+                if (w != null) applyStorm(w, on);
+
+                sender.sendMessage(on ? "§aГроза включена." : "§aГроза выключена.");
+                return true;
+            }
+
+            case "night" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§e/anomaly night <on|off>");
+                    return true;
+                }
+                boolean on = args[1].equalsIgnoreCase("on");
+                getConfig().set("state.night-enabled", on);
+                saveConfig();
+
+                World w = targetWorld();
+                if (w != null) applyNight(w, on);
+
+                sender.sendMessage(on ? "§aНочь зафиксирована." : "§aЦикл дня восстановлен.");
+                return true;
+            }
+
+            case "rift" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§e/anomaly rift <size|rebuild>");
+                    return true;
+                }
+
+                if (args[1].equalsIgnoreCase("size")) {
+                    if (args.length < 5) {
+                        sender.sendMessage("§e/anomaly rift size <length> <halfWidth> <jagged>");
+                        return true;
+                    }
+                    Integer length = tryParseInt(args[2]);
+                    Integer halfWidth = tryParseInt(args[3]);
+                    Integer jagged = tryParseInt(args[4]);
+
+                    if (length == null || halfWidth == null || jagged == null) {
+                        sender.sendMessage("§cЧисла введены неверно.");
+                        return true;
+                    }
+
+                    if (length < 10 || length > 300 || halfWidth < 1 || halfWidth > 30 || jagged < 0 || jagged > 12) {
+                        sender.sendMessage("§cОграничения: length 10-300, halfWidth 1-30, jagged 0-12");
+                        return true;
+                    }
+
+                    getConfig().set("rift.length", length);
+                    getConfig().set("rift.half-width", halfWidth);
+                    getConfig().set("rift.jagged", jagged);
+                    saveConfig();
+
+                    sender.sendMessage("§aНовый размер сохранен. Примени: §e/anomaly rift rebuild");
+                    return true;
+                }
+
+                if (args[1].equalsIgnoreCase("rebuild")) {
+                    World w = targetWorld();
+                    if (w == null) {
+                        sender.sendMessage("§cМир не найден.");
+                        return true;
+                    }
+
+                    boolean wasEnabled = getConfig().getBoolean("state.anomaly-enabled", false);
+
+                    if (riftBuilt) {
+                        restoreRift(w);
+                        dataStore.clear();
+                    }
+
+                    if (wasEnabled) {
+                        buildRiftToBedrock(w);
+                        saveRiftState();
+                        sender.sendMessage("§aРазлом перестроен.");
+                    } else {
+                        sender.sendMessage("§aСтарый разлом очищен. Включи аномалию: /anomaly on");
+                    }
+                    return true;
+                }
+
+                sender.sendMessage("§e/anomaly rift <size|rebuild>");
+                return true;
+            }
+
+            default -> {
+                help(sender);
+                return true;
+            }
         }
-        return true;
     }
 
     @EventHandler
@@ -111,7 +263,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 1);
         boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 1);
 
-        // Анти-падение глубоко в разлом
         int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
         if (inZ && inX && to.getY() <= teleportY) {
             Location safe = findSafeLocation(w);
@@ -125,13 +276,23 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
         s.sendMessage("§e/anomaly status");
+        s.sendMessage("§e/anomaly fog <on|off|level 0-3>");
+        s.sendMessage("§e/anomaly storm <on|off>");
+        s.sendMessage("§e/anomaly night <on|off>");
+        s.sendMessage("§e/anomaly rift size <length> <halfWidth> <jagged>");
+        s.sendMessage("§e/anomaly rift rebuild");
+    }
+
+    private Integer tryParseInt(String s) {
+        try { return Integer.parseInt(s); } catch (Exception ex) { return null; }
     }
 
     private void enableAnomaly() {
         World w = targetWorld();
         if (w == null) return;
 
-        lockNightAndStorm(w, true);
+        applyNight(w, getConfig().getBoolean("state.night-enabled", true));
+        applyStorm(w, getConfig().getBoolean("state.storm-enabled", true));
 
         if (!riftBuilt) {
             buildRiftToBedrock(w);
@@ -149,7 +310,9 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         stopTasks();
         clearPlayerEffects();
-        lockNightAndStorm(w, false);
+
+        applyNight(w, false);
+        applyStorm(w, false);
 
         if (riftBuilt) {
             restoreRift(w);
@@ -172,20 +335,22 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         return new Location(w, x + 0.5, y, z + 0.5, spawn.getYaw(), spawn.getPitch());
     }
 
-    private void lockNightAndStorm(World w, boolean enable) {
+    private void applyStorm(World w, boolean enable) {
         if (enable) {
-            w.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
-            w.setTime(18000L);
             w.setStorm(true);
             w.setThundering(true);
             w.setWeatherDuration(Integer.MAX_VALUE);
             w.setThunderDuration(Integer.MAX_VALUE);
         } else {
-            w.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true);
             w.setStorm(false);
             w.setThundering(false);
             w.setClearWeatherDuration(20 * 60 * 5);
         }
+    }
+
+    private void applyNight(World w, boolean enable) {
+        w.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, !enable);
+        if (enable) w.setTime(18000L);
     }
 
     private void buildRiftToBedrock(World w) {
@@ -268,13 +433,49 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         ambienceTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
             if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
 
+            boolean fogEnabled = getConfig().getBoolean("effects.fog.enabled", true);
+            int baseFogLevel = getConfig().getInt("effects.fog.level", 1);
+
+            int cx = (riftCenter != null) ? riftCenter.getBlockX() : 0;
+            int cz = (riftCenter != null) ? riftCenter.getBlockZ() : 0;
+
             for (Player p : w.getPlayers()) {
-                p.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, period + 40, 0, true, false, false));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, period + 40, 0, true, false, false));
+                p.removePotionEffect(PotionEffectType.DARKNESS);
+                p.removePotionEffect(PotionEffectType.SLOWNESS);
+
+                if (!fogEnabled || baseFogLevel <= 0) continue;
+
+                int finalFogLevel = baseFogLevel;
+
+                if (riftCenter != null) {
+                    double dx = p.getLocation().getX() - cx;
+                    double dz = p.getLocation().getZ() - cz;
+                    double dist = Math.sqrt(dx * dx + dz * dz);
+
+                    double nearRadius = getConfig().getDouble("effects.fog.near-radius", 18.0);
+                    double midRadius  = getConfig().getDouble("effects.fog.mid-radius", 36.0);
+
+                    if (dist <= nearRadius) finalFogLevel = 3;
+                    else if (dist <= midRadius) finalFogLevel = Math.max(finalFogLevel, 2);
+                }
+
+                applyFogLevel(p, period, finalFogLevel);
             }
 
             if (riftCenter != null) spawnRiftParticles(w);
         }, 0L, period);
+    }
+
+    private void applyFogLevel(Player p, int period, int level) {
+        if (level <= 0) return;
+
+        p.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, period + 40, 0, true, false, false));
+
+        if (level == 2) {
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, period + 40, 0, true, false, false));
+        } else if (level >= 3) {
+            p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, period + 40, 1, true, false, false));
+        }
     }
 
     private void startHazardTask(World w) {
@@ -300,9 +501,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
                 if (inZ && nearX) {
                     p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 50, 0, true, true, true));
-                    if (ThreadLocalRandom.current().nextInt(100) < 20) {
-                        p.damage(1.0);
-                    }
+                    if (ThreadLocalRandom.current().nextInt(100) < 20) p.damage(1.0);
                 }
             }
         }, 20L, period);
@@ -329,10 +528,16 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         stopWeatherLockTask();
         weatherLockTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
             if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
-            if (!w.hasStorm()) w.setStorm(true);
-            if (!w.isThundering()) w.setThundering(true);
-            w.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
-            if (w.getTime() < 17000 || w.getTime() > 22000) w.setTime(18000L);
+
+            if (getConfig().getBoolean("state.storm-enabled", true)) {
+                if (!w.hasStorm()) w.setStorm(true);
+                if (!w.isThundering()) w.setThundering(true);
+            }
+
+            if (getConfig().getBoolean("state.night-enabled", true)) {
+                w.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+                if (w.getTime() < 17000 || w.getTime() > 22000) w.setTime(18000L);
+            }
         }, 0L, 200L);
     }
 
@@ -360,6 +565,13 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (hazardTaskId != -1) {
             Bukkit.getScheduler().cancelTask(hazardTaskId);
             hazardTaskId = -1;
+        }
+    }
+
+    private void clearFogOnly() {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            p.removePotionEffect(PotionEffectType.DARKNESS);
+            p.removePotionEffect(PotionEffectType.SLOWNESS);
         }
     }
 
@@ -400,11 +612,21 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void applyDefaultsIfMissing() {
+        addDefault("world", "world");
+
+        addDefault("state.anomaly-enabled", false);
+        addDefault("state.storm-enabled", true);
+        addDefault("state.night-enabled", true);
+
         addDefault("rift.length", 22);
         addDefault("rift.half-width", 2);
         addDefault("rift.jagged", 2);
 
         addDefault("effects.refresh-ticks", 30);
+        addDefault("effects.fog.enabled", true);
+        addDefault("effects.fog.level", 1);
+        addDefault("effects.fog.near-radius", 18.0);
+        addDefault("effects.fog.mid-radius", 36.0);
 
         addDefault("hazard.period-ticks", 40);
         addDefault("hazard.extra-radius", 3);
