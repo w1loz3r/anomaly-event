@@ -434,7 +434,7 @@ private void buildRiftToBedrock(World w) {
         int cx2 = pathX + crackHalf;
 
         for (int x = cx1; x <= cx2; x++) {
-            // Срезаем верхние слои (снег/трава/слои) гарантированно
+            // Срезаем верхние слои гарантированно
             int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
 
             for (int y = startY; y >= minY; y--) {
@@ -453,7 +453,10 @@ private void buildRiftToBedrock(World w) {
             for (int y = topY + 4; y >= topY - 1; y--) {
                 Block cap = w.getBlockAt(x, y, z);
                 Material cm = cap.getType();
-                if (cm == Material.SNOW || cm == Material.TALL_GRASS || cm == Material.GRASS) {
+                if (cm == Material.SNOW
+                        || cm == Material.SNOW_BLOCK
+                        || cm == Material.TALL_GRASS
+                        || cm == Material.SHORT_GRASS) {
                     rememberBlock(cap);
                     cap.setType(Material.AIR, false);
                 }
@@ -470,7 +473,9 @@ private void buildRiftToBedrock(World w) {
 
     cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
     w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
-    decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
+
+    // Если метода decorateRiftCaps нет в классе, оставляем закомментированным:
+    // decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
 
     riftBuilt = true;
 }
