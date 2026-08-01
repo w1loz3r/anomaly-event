@@ -243,34 +243,40 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onMove(PlayerMoveEvent e) {
-        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
-        if (riftCenter == null) return;
+public void onMove(PlayerMoveEvent e) {
+    if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
+    if (riftCenter == null) return;
 
-        Player p = e.getPlayer();
-        Location to = e.getTo();
-        if (to == null) return;
+    Player p = e.getPlayer();
+    Location to = e.getTo();
+    if (to == null) return;
 
-        World w = riftCenter.getWorld();
-        if (w == null || !to.getWorld().equals(w)) return;
+    World w = riftCenter.getWorld();
+    if (w == null || !to.getWorld().equals(w)) return;
 
-        int cx = riftCenter.getBlockX();
-        int cz = riftCenter.getBlockZ();
+    int cx = riftCenter.getBlockX();
+    int cz = riftCenter.getBlockZ();
 
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
+    int length = getConfig().getInt("rift.length", 22);
+    int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-        boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 1);
-        boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 1);
+    boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 1);
+    boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 1);
 
-        int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
-        if (inZ && inX && to.getY() <= teleportY) {
-            Location safe = findSafeLocation(w);
-            p.teleport(safe);
-            p.playSound(safe, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.8f);
-            p.sendMessage("§5[Аномалия] §dТебя выбросило из разлома.");
-        }
+    if (!(inZ && inX)) return;
+
+    // Не телепортировать, если игрок еще сверху над разломом
+    int riftTopY = riftCenter.getBlockY();
+    if (to.getY() >= (riftTopY - 0.2)) return;
+
+    int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
+    if (to.getY() <= teleportY) {
+        Location safe = findSafeLocation(w);
+        p.teleport(safe);
+        p.playSound(safe, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.8f);
+        p.sendMessage("§5[Аномалия] §dТебя выбросило из разлома.");
     }
+}
 
     private void help(CommandSender s) {
         s.sendMessage("§e/anomaly on");
