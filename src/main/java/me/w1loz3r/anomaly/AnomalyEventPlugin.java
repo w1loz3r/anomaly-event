@@ -520,39 +520,47 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void decorateEdge(Block b, int y, int minY) {
-        Material m;
-        int roll = ThreadLocalRandom.current().nextInt(100);
+    if (b.getType() != Material.AIR) return; // не затираем существующие блоки
 
-        if (y <= minY + 8 && roll < 30) m = Material.LAVA;
-        else if (roll < 8) m = Material.SCULK;
-        else if (roll < 18) m = Material.CRYING_OBSIDIAN;
-        else if (roll < 55) m = Material.DEEPSLATE_TILES;
-        else m = Material.POLISHED_BLACKSTONE;
+    Block support = b.getRelative(0, -1, 0);
+    if (support.getType() == Material.AIR) return; // нет опоры -> не ставим "висяк"
 
-        rememberBlock(b);
-        b.setType(m, false);
+    int roll = ThreadLocalRandom.current().nextInt(100);
+    Material m;
+
+    if (y <= minY + 8 && roll < 22) m = Material.LAVA;
+    else if (roll < 10) m = Material.SCULK;
+    else if (roll < 22) m = Material.CRYING_OBSIDIAN;
+    else if (roll < 60) m = Material.DEEPSLATE_TILES;
+    else m = Material.POLISHED_BLACKSTONE;
+
+    rememberBlock(b);
+    b.setType(m, false);
+}
+
+private void decorateDepthEdge(Block b, int y, int minY) {
+    if (b.getType() != Material.AIR) return; // не заменяем существующее
+    Block support = b.getRelative(0, -1, 0);
+    if (support.getType() == Material.AIR) return; // без опоры не ставим
+
+    int roll = ThreadLocalRandom.current().nextInt(100);
+    Material m;
+
+    if (y <= minY + 12) {
+        if (roll < 45) m = Material.BLACKSTONE;
+        else if (roll < 75) m = Material.POLISHED_BLACKSTONE_BRICKS;
+        else if (roll < 90) m = Material.SCULK;
+        else m = Material.CRYING_OBSIDIAN;
+    } else {
+        if (roll < 35) m = Material.DEEPSLATE_BRICKS;
+        else if (roll < 65) m = Material.POLISHED_BLACKSTONE;
+        else if (roll < 85) m = Material.SCULK;
+        else m = Material.CRYING_OBSIDIAN;
     }
 
-    private void decorateDepthEdge(Block b, int y, int minY) {
-        int roll = ThreadLocalRandom.current().nextInt(100);
-        Material m;
-
-        if (y <= minY + 12) {
-            if (roll < 45) m = Material.BLACKSTONE;
-            else if (roll < 75) m = Material.POLISHED_BLACKSTONE_BRICKS;
-            else if (roll < 90) m = Material.SCULK;
-            else m = Material.CRYING_OBSIDIAN;
-        } else {
-            if (roll < 35) m = Material.DEEPSLATE_BRICKS;
-            else if (roll < 65) m = Material.POLISHED_BLACKSTONE;
-            else if (roll < 85) m = Material.SCULK;
-            else m = Material.CRYING_OBSIDIAN;
-        }
-
-        rememberBlock(b);
-        b.setType(m, false);
-    }
-
+    rememberBlock(b);
+    b.setType(m, false);
+}
     private void spawnRiftParticles(World w) {
         if (riftCenter == null) return;
 
