@@ -43,7 +43,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             Bukkit.getScheduler().runTask(this, this::enableAnomaly);
         }
 
-        getLogger().info("AnomalyEvent v2.5 enabled.");
+        getLogger().info("AnomalyEvent v2.6 enabled.");
     }
 
     @Override
@@ -51,7 +51,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         stopTasks();
         clearPlayerEffects();
         saveRiftState();
-        getLogger().info("AnomalyEvent v2.5 disabled.");
+        getLogger().info("AnomalyEvent v2.6 disabled.");
     }
 
     @Override
@@ -77,7 +77,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§aАномалия включена.");
                 return true;
             }
-
             case "off" -> {
                 getConfig().set("state.anomaly-enabled", false);
                 saveConfig();
@@ -86,7 +85,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§aАномалия выключена.");
                 return true;
             }
-
             case "status" -> {
                 sender.sendMessage("§7=== §dAnomaly Status §7===");
                 sender.sendMessage("§7enabled: §f" + getConfig().getBoolean("state.anomaly-enabled", false));
@@ -96,26 +94,19 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§7fog-level: §f" + getConfig().getInt("effects.fog.level", 1));
                 sender.sendMessage("§7rift-built: §f" + riftBuilt);
                 sender.sendMessage("§7saved-blocks: §f" + changedBlocks.size());
-                sender.sendMessage("§7rift.length: §f" + getConfig().getInt("rift.length", 22));
-                sender.sendMessage("§7rift.half-width: §f" + getConfig().getInt("rift.half-width", 2));
-                sender.sendMessage("§7rift.bottom-half-width: §f" + getConfig().getInt("rift.bottom-half-width", 1));
-                sender.sendMessage("§7rift.shell-thickness: §f" + getConfig().getInt("rift.shell-thickness", 2));
                 return true;
             }
-
             case "fog" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
                     return true;
                 }
-
                 if (args[1].equalsIgnoreCase("on")) {
                     getConfig().set("effects.fog.enabled", true);
                     saveConfig();
                     sender.sendMessage("§aТуман включен.");
                     return true;
                 }
-
                 if (args[1].equalsIgnoreCase("off")) {
                     getConfig().set("effects.fog.enabled", false);
                     saveConfig();
@@ -123,7 +114,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     sender.sendMessage("§aТуман выключен.");
                     return true;
                 }
-
                 if (args[1].equalsIgnoreCase("level")) {
                     if (args.length < 3) {
                         sender.sendMessage("§e/anomaly fog level <0-3>");
@@ -140,11 +130,9 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     sender.sendMessage("§aУровень тумана: " + lvl);
                     return true;
                 }
-
                 sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
                 return true;
             }
-
             case "storm" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly storm <on|off>");
@@ -160,7 +148,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aГроза включена." : "§aГроза выключена.");
                 return true;
             }
-
             case "night" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly night <on|off>");
@@ -176,7 +163,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aНочь зафиксирована." : "§aЦикл дня восстановлен.");
                 return true;
             }
-
             case "rift" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly rift <size|rebuild>");
@@ -186,13 +172,12 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 if (args[1].equalsIgnoreCase("size")) {
                     if (args.length < 5) {
                         sender.sendMessage("§e/anomaly rift size <length> <halfWidthTop> <jagged>");
-                        sender.sendMessage("§7(jagged оставлен для совместимости, фактически не влияет в v2.5)");
                         return true;
                     }
 
                     Integer length = tryParseInt(args[2]);
                     Integer halfWidthTop = tryParseInt(args[3]);
-                    Integer jaggedCompat = tryParseInt(args[4]);
+                    Integer jaggedCompat = tryParseInt(args[4]); // для совместимости команды
 
                     if (length == null || halfWidthTop == null || jaggedCompat == null) {
                         sender.sendMessage("§cЧисла введены неверно.");
@@ -206,12 +191,10 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
                     getConfig().set("rift.length", length);
                     getConfig().set("rift.half-width", halfWidthTop);
-                    getConfig().set("rift.jagged", jaggedCompat); // совместимость
-                    // по умолчанию низ делаем уже
-                    int bottom = Math.max(1, halfWidthTop / 3);
-                    getConfig().set("rift.bottom-half-width", bottom);
-
+                    getConfig().set("rift.jagged", jaggedCompat);
+                    getConfig().set("rift.bottom-half-width", Math.max(1, halfWidthTop / 3));
                     saveConfig();
+
                     sender.sendMessage("§aНовый размер сохранен. Примени: §e/anomaly rift rebuild");
                     return true;
                 }
@@ -243,7 +226,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§e/anomaly rift <size|rebuild>");
                 return true;
             }
-
             default -> {
                 help(sender);
                 return true;
@@ -266,14 +248,13 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
 
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
+        int a = Math.max(2, getConfig().getInt("rift.half-width", 8));
+        int b = Math.max(6, getConfig().getInt("rift.length", 80) / 2);
 
-        boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 2);
-        boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 2);
+        boolean inside = isInsideEllipse(to.getBlockX(), to.getBlockZ(), cx, cz, a, b);
 
         int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
-        if (inZ && inX && to.getY() <= teleportY) {
+        if (inside && to.getY() <= teleportY) {
             Location safe = findSafeLocation(w);
             p.teleport(safe);
             p.playSound(safe, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.8f);
@@ -310,14 +291,11 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
 
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-        int protectPad = getConfig().getInt("rift.protect-padding", 4);
+        int a = Math.max(2, getConfig().getInt("rift.half-width", 8));
+        int b = Math.max(6, getConfig().getInt("rift.length", 80) / 2);
+        int pad = Math.max(0, getConfig().getInt("rift.protect-padding", 4));
 
-        boolean inZ = Math.abs(loc.getBlockZ() - cz) <= (length / 2 + protectPad);
-        boolean inX = Math.abs(loc.getBlockX() - cx) <= (halfWidth + 3 + protectPad);
-
-        return inZ && inX;
+        return isInsideEllipse(loc.getBlockX(), loc.getBlockZ(), cx, cz, a + pad, b + pad);
     }
 
     private void help(CommandSender s) {
@@ -401,12 +379,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (enable) w.setTime(18000L);
     }
 
-    /**
-     * Стабильная детерминированная генерация:
-     * - без случайного смещения оси (рамка не "плывет")
-     * - плавное сужение к низу
-     * - чистка блоков над разломом
-     */
     private void buildRiftToBedrock(World w) {
         Location spawn = w.getSpawnLocation();
         int cx = spawn.getBlockX();
@@ -415,35 +387,55 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int minY = w.getMinHeight();
         int topY = w.getHighestBlockYAt(cx, cz) + 1;
 
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidthTop = getConfig().getInt("rift.half-width", 2);
-        int halfWidthBottom = Math.max(1, getConfig().getInt("rift.bottom-half-width", 1));
-        int shellThickness = getConfig().getInt("rift.shell-thickness", 2);
+        int length = getConfig().getInt("rift.length", 80);
+        int halfWidthTop = getConfig().getInt("rift.half-width", 8);
+        int halfWidthBottom = Math.max(1, getConfig().getInt("rift.bottom-half-width", 3));
+        int shellThickness = Math.max(1, getConfig().getInt("rift.shell-thickness", 2));
 
         riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
 
+        int aTop = Math.max(2, halfWidthTop);
+        int bTop = Math.max(6, length / 2);
         int height = Math.max(1, topY - minY);
 
-        for (int dz = -length / 2; dz <= length / 2; dz++) {
-            for (int y = topY; y >= minY; y--) {
-                double t = (double) (topY - y) / (double) height; // 0..1
-                int currentHalfWidth = (int) Math.round(halfWidthTop * (1.0 - t) + halfWidthBottom * t);
+        int xMin = cx - aTop - shellThickness - 2;
+        int xMax = cx + aTop + shellThickness + 2;
+        int zMin = cz - bTop - shellThickness - 2;
+        int zMax = cz + bTop + shellThickness + 2;
 
-                // 1) Чистим внутренность разлома
-                for (int dx = -currentHalfWidth; dx <= currentHalfWidth; dx++) {
-                    int x = cx + dx;
-                    int z = cz + dz;
+        for (int y = topY; y >= minY; y--) {
+            double t = (double) (topY - y) / (double) height;
 
-                    Block b = w.getBlockAt(x, y, z);
-                    rememberBlock(b);
-                    b.setType(Material.AIR, false);
+            int a = (int) Math.round(aTop * (1.0 - t) + halfWidthBottom * t);
+            int b = (int) Math.round(bTop * (1.0 - t) + Math.max(3, bTop / 3.0) * t);
+
+            for (int x = xMin; x <= xMax; x++) {
+                for (int z = zMin; z <= zMax; z++) {
+                    boolean inCore = isInsideEllipse(x, z, cx, cz, a, b);
+                    boolean inShell = isInsideEllipse(x, z, cx, cz, a + shellThickness, b + shellThickness);
+
+                    Block block = w.getBlockAt(x, y, z);
+
+                    if (inCore) {
+                        rememberBlock(block);
+                        block.setType(Material.AIR, false);
+                        continue;
+                    }
+
+                    if (inShell) {
+                        boolean outerLayer = !isInsideEllipse(x, z, cx, cz, a + shellThickness - 1, b + shellThickness - 1);
+                        Material frameMat = pickFrameMaterial(y, minY, topY, outerLayer);
+                        rememberBlock(block);
+                        block.setType(frameMat, false);
+                    }
                 }
+            }
 
-                // 2) Чистим все блоки НАД разломом
-                if (y == topY) {
-                    for (int dx = -currentHalfWidth; dx <= currentHalfWidth; dx++) {
-                        int x = cx + dx;
-                        int z = cz + dz;
+            if (y == topY) {
+                for (int x = cx - aTop; x <= cx + aTop; x++) {
+                    for (int z = cz - bTop; z <= cz + bTop; z++) {
+                        if (!isInsideEllipse(x, z, cx, cz, aTop, bTop)) continue;
+
                         for (int ay = topY + 1; ay <= w.getMaxHeight() - 1; ay++) {
                             Block above = w.getBlockAt(x, ay, z);
                             if (above.getType() != Material.AIR) {
@@ -453,28 +445,24 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                         }
                     }
                 }
-
-                // 3) Стабильная красивая рамка
-                for (int s = 1; s <= shellThickness; s++) {
-                    int leftX = cx - currentHalfWidth - s;
-                    int rightX = cx + currentHalfWidth + s;
-
-                    decorateEdgeStable(w.getBlockAt(leftX, y, cz + dz), y, minY, s);
-                    decorateEdgeStable(w.getBlockAt(rightX, y, cz + dz), y, minY, s);
-                }
             }
         }
 
-        // Верхний обод по всей длине
-        for (int dz = -length / 2; dz <= length / 2; dz++) {
-            int leftX = cx - halfWidthTop - 1;
-            int rightX = cx + halfWidthTop + 1;
+        for (int x = cx - aTop - 2; x <= cx + aTop + 2; x++) {
+            for (int z = cz - bTop - 2; z <= cz + bTop + 2; z++) {
+                boolean ring1 = isInsideEllipse(x, z, cx, cz, aTop + 1, bTop + 1) && !isInsideEllipse(x, z, cx, cz, aTop, bTop);
+                boolean ring2 = isInsideEllipse(x, z, cx, cz, aTop + 2, bTop + 2) && !isInsideEllipse(x, z, cx, cz, aTop + 1, bTop + 1);
 
-            setIfNeeded(w.getBlockAt(leftX, topY, cz + dz), Material.CRYING_OBSIDIAN);
-            setIfNeeded(w.getBlockAt(rightX, topY, cz + dz), Material.CRYING_OBSIDIAN);
-
-            setIfNeeded(w.getBlockAt(leftX - 1, topY, cz + dz), Material.POLISHED_BLACKSTONE_BRICKS);
-            setIfNeeded(w.getBlockAt(rightX + 1, topY, cz + dz), Material.POLISHED_BLACKSTONE_BRICKS);
+                if (ring1) {
+                    Block rim = w.getBlockAt(x, topY, z);
+                    rememberBlock(rim);
+                    rim.setType(Material.CRYING_OBSIDIAN, false);
+                } else if (ring2) {
+                    Block rim = w.getBlockAt(x, topY, z);
+                    rememberBlock(rim);
+                    rim.setType(Material.POLISHED_BLACKSTONE_BRICKS, false);
+                }
+            }
         }
 
         Block core = w.getBlockAt(cx, topY - 1, cz);
@@ -485,32 +473,56 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         riftBuilt = true;
     }
 
-    private void setIfNeeded(Block b, Material m) {
-        rememberBlock(b);
-        b.setType(m, false);
-    }
+    private Material pickFrameMaterial(int y, int minY, int topY, boolean outerLayer) {
+        int fromBottom = y - minY;
+        int fromTop = topY - y;
 
-    private void decorateEdgeStable(Block b, int y, int minY, int shellLayer) {
-        Material mat;
-        int depthFromBottom = y - minY;
-
-        if (depthFromBottom <= 8) {
-            mat = (shellLayer == 1) ? Material.CRYING_OBSIDIAN : Material.MAGMA_BLOCK;
-        } else if (depthFromBottom <= 20) {
-            mat = (shellLayer == 1) ? Material.POLISHED_BLACKSTONE_BRICKS : Material.DEEPSLATE_TILES;
-        } else {
-            mat = (shellLayer == 1) ? Material.DEEPSLATE_BRICKS : Material.POLISHED_BLACKSTONE;
+        if (fromBottom <= 10) {
+            int r = ThreadLocalRandom.current().nextInt(100);
+            if (r < 35) return Material.MAGMA_BLOCK;
+            if (r < 60) return Material.CRYING_OBSIDIAN;
+            if (r < 78) return Material.BLACKSTONE;
+            return Material.POLISHED_BLACKSTONE_BRICKS;
         }
 
-        rememberBlock(b);
-        b.setType(mat, false);
+        if (fromTop <= 4) {
+            int r = ThreadLocalRandom.current().nextInt(100);
+            if (outerLayer) {
+                if (r < 45) return Material.CRYING_OBSIDIAN;
+                if (r < 75) return Material.POLISHED_BLACKSTONE_BRICKS;
+                return Material.GILDED_BLACKSTONE;
+            } else {
+                if (r < 50) return Material.DEEPSLATE_BRICKS;
+                if (r < 80) return Material.CRACKED_DEEPSLATE_BRICKS;
+                return Material.POLISHED_BLACKSTONE;
+            }
+        }
+
+        int r = ThreadLocalRandom.current().nextInt(100);
+        if (outerLayer) {
+            if (r < 35) return Material.CRYING_OBSIDIAN;
+            if (r < 65) return Material.POLISHED_BLACKSTONE_BRICKS;
+            if (r < 85) return Material.DEEPSLATE_TILES;
+            return Material.CHISELED_DEEPSLATE;
+        } else {
+            if (r < 40) return Material.DEEPSLATE_BRICKS;
+            if (r < 70) return Material.POLISHED_BLACKSTONE;
+            if (r < 88) return Material.BLACKSTONE;
+            return Material.BASALT;
+        }
+    }
+
+    private boolean isInsideEllipse(int x, int z, int cx, int cz, int a, int b) {
+        if (a <= 0 || b <= 0) return false;
+        double nx = (double) (x - cx) / (double) a;
+        double nz = (double) (z - cz) / (double) b;
+        return (nx * nx + nz * nz) <= 1.0;
     }
 
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
             String[] p = e.getKey().split(":");
             if (p.length != 3) continue;
-
             int x = Integer.parseInt(p[0]);
             int y = Integer.parseInt(p[1]);
             int z = Integer.parseInt(p[2]);
@@ -585,17 +597,13 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             int cx = riftCenter.getBlockX();
             int cz = riftCenter.getBlockZ();
 
-            int length = getConfig().getInt("rift.length", 22);
-            int halfWidth = getConfig().getInt("rift.half-width", 2);
-            int hazardExtra = getConfig().getInt("hazard.extra-radius", 4);
+            int a = Math.max(2, getConfig().getInt("rift.half-width", 8));
+            int b = Math.max(6, getConfig().getInt("rift.length", 80) / 2);
+            int extra = Math.max(0, getConfig().getInt("hazard.extra-radius", 4));
 
             for (Player p : w.getPlayers()) {
                 Location l = p.getLocation();
-
-                boolean inZ = Math.abs(l.getBlockZ() - cz) <= (length / 2 + hazardExtra);
-                boolean nearX = Math.abs(l.getBlockX() - cx) <= (halfWidth + 3 + hazardExtra);
-
-                if (inZ && nearX) {
+                if (isInsideEllipse(l.getBlockX(), l.getBlockZ(), cx, cz, a + extra, b + extra)) {
                     p.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 50, 0, true, true, true));
                     if (ThreadLocalRandom.current().nextInt(100) < 25) p.damage(1.0);
                 }
@@ -604,43 +612,34 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void spawnRiftParticles(World w) {
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
+        int length = getConfig().getInt("rift.length", 80);
+        int halfWidth = getConfig().getInt("rift.half-width", 8);
 
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
         int topY = w.getHighestBlockYAt(cx, cz);
 
-        // адаптивно под размеры
-        int step = (length >= 120) ? 1 : 2;
-        int centerBursts = Math.max(12, halfWidth * 4);
-        int sideBursts = Math.max(10, halfWidth * 3);
+        int a = Math.max(2, halfWidth);
+        int b = Math.max(6, length / 2);
 
-        for (int dz = -length / 2; dz <= length / 2; dz += step) {
-            for (int i = 0; i < centerBursts; i++) {
-                double px = cx + ThreadLocalRandom.current().nextDouble(-halfWidth * 0.7, halfWidth * 0.7);
-                double pz = cz + dz + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
-                double py = topY + ThreadLocalRandom.current().nextDouble(0.2, 2.8);
+        int count = Math.max(120, (a + b) * 6);
 
-                w.spawnParticle(Particle.PORTAL, px, py, pz, 1, 0, 0, 0, 0.02);
-                w.spawnParticle(Particle.SMOKE, px, py, pz, 1, 0, 0, 0, 0.001);
-                w.spawnParticle(Particle.SOUL, px, py, pz, 1, 0, 0, 0, 0.001);
-            }
+        for (int i = 0; i < count; i++) {
+            double angle = ThreadLocalRandom.current().nextDouble(0, Math.PI * 2.0);
 
-            double leftX = cx - halfWidth - 0.5;
-            double rightX = cx + halfWidth + 0.5;
+            double ringA = a + ThreadLocalRandom.current().nextDouble(0.0, 1.8);
+            double ringB = b + ThreadLocalRandom.current().nextDouble(0.0, 1.8);
 
-            for (int i = 0; i < sideBursts; i++) {
-                double py = topY + ThreadLocalRandom.current().nextDouble(0.1, 2.4);
-                double pz = cz + dz + ThreadLocalRandom.current().nextDouble(-0.35, 0.35);
+            double x = cx + Math.cos(angle) * ringA;
+            double z = cz + Math.sin(angle) * ringB;
+            double y = topY + ThreadLocalRandom.current().nextDouble(0.1, 2.8);
 
-                w.spawnParticle(Particle.ENCHANT, leftX, py, pz, 1, 0, 0, 0, 0.01);
-                w.spawnParticle(Particle.ENCHANT, rightX, py, pz, 1, 0, 0, 0, 0.01);
+            w.spawnParticle(Particle.PORTAL, x, y, z, 1, 0, 0, 0, 0.02);
+            w.spawnParticle(Particle.REVERSE_PORTAL, x, y, z, 1, 0, 0, 0, 0.02);
+            w.spawnParticle(Particle.SMOKE, x, y, z, 1, 0, 0, 0, 0.001);
 
-                if (ThreadLocalRandom.current().nextInt(100) < 35) {
-                    w.spawnParticle(Particle.REVERSE_PORTAL, leftX, py, pz, 1, 0, 0, 0, 0.02);
-                    w.spawnParticle(Particle.REVERSE_PORTAL, rightX, py, pz, 1, 0, 0, 0, 0.02);
-                }
+            if (ThreadLocalRandom.current().nextInt(100) < 40) {
+                w.spawnParticle(Particle.SOUL, x, y, z, 1, 0, 0, 0, 0.001);
             }
         }
     }
@@ -716,14 +715,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     private void saveRiftState() {
         World w = targetWorld();
         if (w == null || riftCenter == null) return;
-        dataStore.save(
-                changedBlocks,
-                riftBuilt,
-                w.getName(),
-                riftCenter.getBlockX(),
-                riftCenter.getBlockY(),
-                riftCenter.getBlockZ()
-        );
+        dataStore.save(changedBlocks, riftBuilt, w.getName(), riftCenter.getBlockX(), riftCenter.getBlockY(), riftCenter.getBlockZ());
     }
 
     private void loadRiftState() {
@@ -746,10 +738,10 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         addDefault("state.storm-enabled", true);
         addDefault("state.night-enabled", true);
 
-        addDefault("rift.length", 22);
-        addDefault("rift.half-width", 2);
-        addDefault("rift.bottom-half-width", 1);
-        addDefault("rift.jagged", 2); // только совместимость старых конфигов
+        addDefault("rift.length", 80);
+        addDefault("rift.half-width", 8);
+        addDefault("rift.bottom-half-width", 3);
+        addDefault("rift.jagged", 2); // совместимость
         addDefault("rift.shell-thickness", 2);
         addDefault("rift.protect-padding", 4);
 
