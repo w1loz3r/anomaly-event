@@ -55,7 +55,6 @@ public final class RiftDataStore {
                 if (mat != null) out.changedBlocks.put(key, mat);
             }
         }
-
         return out;
     }
 
@@ -68,9 +67,7 @@ public final class RiftDataStore {
     public static final class LoadedRiftState {
         public boolean riftBuilt = false;
         public String world = "world";
-        public int cx = 0;
-        public int cy = 0;
-        public int cz = 0;
+        public int cx, cy, cz;
         public Map<String, Material> changedBlocks = new HashMap<>();
     }
 }
