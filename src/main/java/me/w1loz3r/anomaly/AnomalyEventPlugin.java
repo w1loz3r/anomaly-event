@@ -386,6 +386,15 @@ public void onMove(PlayerMoveEvent e) {
                     Block b = w.getBlockAt(x, y, z);
                     rememberBlock(b);
                     b.setType(Material.AIR, false);
+                    if (y == topY) {
+    for (int ay = topY + 1; ay <= w.getMaxHeight() - 1; ay++) {
+        Block above = w.getBlockAt(x, ay, z);
+        if (above.getType() != Material.AIR) {
+            rememberBlock(above);
+            above.setType(Material.AIR, false);
+        }
+    }
+}
                 }
 
                 int edgeX1 = cx - dynamicHalfWidth - 1 + localShift;
