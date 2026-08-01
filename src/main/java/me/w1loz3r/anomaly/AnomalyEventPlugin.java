@@ -429,11 +429,56 @@ public void onBreak(BlockBreakEvent e) {
         Block core = w.getBlockAt(cx, topY - 1, cz);
         rememberBlock(core);
         core.setType(Material.CRYING_OBSIDIAN, false);
-
+        cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
         w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
+        
         riftBuilt = true;
     }
+private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
+    int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
+    int up = getConfig().getInt("rift.cleanup-up", 20);
+    int down = getConfig().getInt("rift.cleanup-down", 2);
 
+    int minX = cx - (halfWidth + sidePad);
+    int maxX = cx + (halfWidth + sidePad);
+    int minZ = cz - (length / 2 + 1);
+    int maxZ = cz + (length / 2 + 1);
+
+    int minY = Math.max(w.getMinHeight(), topY - down);
+    int maxY = Math.min(w.getMaxHeight() - 1, topY + up);
+
+    for (int x = minX; x <= maxX; x++) {
+        for (int z = minZ; z <= maxZ; z++) {
+            for (int y = minY; y <= maxY; y++) {
+                Block b = w.getBlockAt(x, y, z);
+                Material m = b.getType();
+                String n = m.name();
+
+                boolean isVegetation =
+                        n.endsWith("_LOG") ||
+                        n.endsWith("_WOOD") ||
+                        n.endsWith("_LEAVES") ||
+                        n.equals("VINE") ||
+                        n.equals("CAVE_VINES") ||
+                        n.equals("CAVE_VINES_PLANT") ||
+                        n.equals("TWISTING_VINES") ||
+                        n.equals("TWISTING_VINES_PLANT") ||
+                        n.equals("WEEPING_VINES") ||
+                        n.equals("WEEPING_VINES_PLANT") ||
+                        n.equals("BAMBOO") ||
+                        n.equals("BAMBOO_SAPLING") ||
+                        n.equals("MANGROVE_ROOTS") ||
+                        n.equals("MUDDY_MANGROVE_ROOTS") ||
+                        n.equals("CHERRY_LEAVES");
+
+                if (isVegetation) {
+                    rememberBlock(b);
+                    b.setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+}
     private void decorateEdge(Block b, int y, int minY) {
         Material m;
         int roll = ThreadLocalRandom.current().nextInt(100);
@@ -648,6 +693,9 @@ public void onBreak(BlockBreakEvent e) {
     }
 
     private void applyDefaultsIfMissing() {
+        addDefault("rift.cleanup-side-pad", 4);
+        addDefault("rift.cleanup-up", 20);
+        addDefault("rift.cleanup-down", 2);
         addDefault("world", "world");
 
         addDefault("state.anomaly-enabled", false);
