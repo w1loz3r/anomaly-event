@@ -1,4 +1,3 @@
-```java name=src/main/java/me/w1loz3r/anomaly/AnomalyEventPlugin.java
 package me.w1loz3r.anomaly;
 
 import org.bukkit.*;
@@ -644,4 +643,3 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (!getConfig().isSet(path)) getConfig().set(path, value);
     }
 }
-```
