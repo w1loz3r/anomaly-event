@@ -383,27 +383,30 @@ public void onBreak(BlockBreakEvent e) {
     }
 
 private void buildRiftToBedrock(World w) {
-    int cx = getConfig().getInt("rift.center-x", 0);
-    int cz = getConfig().getInt("rift.center-z", 0);
-    int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
+    int cx;
+    int cz;
 
+    if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
+        cx = getConfig().getInt("rift.center-x");
+        cz = getConfig().getInt("rift.center-z");
+    } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
+        cx = riftCenter.getBlockX();
+        cz = riftCenter.getBlockZ();
+    } else {
+        Location sp = w.getSpawnLocation();
+        cx = sp.getBlockX();
+        cz = sp.getBlockZ();
+    }
+
+    int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
     int length = getConfig().getInt("rift.length", 22);
     int halfWidth = getConfig().getInt("rift.half-width", 2);
 
     riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
     int minY = w.getMinHeight() + 1;
 
-    // "Змейка" трещины: непрерывная ломаная линия по X при движении по Z
-    int maxOffset = Math.max(2, halfWidth + 2);
-    int pathX = cx;
-    int drift = 0;
-
-    for (int dz = -length / 2; dz <= length / 2; dz++) {
-        // Плавное изменение направления
-        if (ThreadLocalRandom.current().nextInt(100) < 22) {
-            drift += ThreadLocalRandom.current().nextInt(-1, 2); // -1..1
-            drift = Math.max(-1, Math.min(1, drift));
-        }
+    // ... дальше твой текущий код метода без изменений
+}
 
         // Редкие "изломы"
         if (ThreadLocalRandom.current().nextInt(100) < 8) {
