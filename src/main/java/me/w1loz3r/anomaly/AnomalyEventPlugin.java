@@ -695,7 +695,7 @@ private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int 
     }
 
     private void applyDefaultsIfMissing() {
-        addDefault("rift.cleanup-side-pad", 4);
+        addDefault("rift.cleanup-side-pad", 10);
         addDefault("rift.cleanup-up", 20);
         addDefault("rift.cleanup-down", 2);
         addDefault("world", "world");
