@@ -6,23 +6,26 @@ state:
   night-enabled: true
 
 rift:
-  length: 22
-  half-width: 2
+  length: 80
+  half-width: 8
+  bottom-half-width: 3
   jagged: 2
+  shell-thickness: 2
+  protect-padding: 4
 
 effects:
   refresh-ticks: 30
   fog:
     enabled: true
     level: 1
-    near-radius: 18.0
-    mid-radius: 36.0
+    near-radius: 20.0
+    mid-radius: 42.0
 
 hazard:
   period-ticks: 40
-  extra-radius: 3
+  extra-radius: 4
 
 safety:
-  teleport-min-y: 15
-  safe-offset-x: 6
+  teleport-min-y: 70
+  safe-offset-x: 30
   safe-offset-z: 0
