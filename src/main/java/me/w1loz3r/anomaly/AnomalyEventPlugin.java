@@ -1,6 +1,5 @@
 package me.w1loz3r.anomaly;
 
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
@@ -8,6 +7,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -76,7 +76,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§aАномалия включена.");
                 return true;
             }
-
             case "off" -> {
                 getConfig().set("state.anomaly-enabled", false);
                 saveConfig();
@@ -85,7 +84,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§aАномалия выключена.");
                 return true;
             }
-
             case "status" -> {
                 sender.sendMessage("§7=== §dAnomaly Status §7===");
                 sender.sendMessage("§7enabled: §f" + getConfig().getBoolean("state.anomaly-enabled", false));
@@ -99,7 +97,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§7rift.jagged: §f" + getConfig().getInt("rift.jagged", 2));
                 return true;
             }
-
             case "fog" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
@@ -141,7 +138,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§e/anomaly fog <on|off|level 0-3>");
                 return true;
             }
-
             case "storm" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly storm <on|off>");
@@ -157,7 +153,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aГроза включена." : "§aГроза выключена.");
                 return true;
             }
-
             case "night" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly night <on|off>");
@@ -173,7 +168,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aНочь зафиксирована." : "§aЦикл дня восстановлен.");
                 return true;
             }
-
             case "rift" -> {
                 if (args.length < 2) {
                     sender.sendMessage("§e/anomaly rift <size|rebuild>");
@@ -235,7 +229,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage("§e/anomaly rift <size|rebuild>");
                 return true;
             }
-
             default -> {
                 help(sender);
                 return true;
@@ -244,63 +237,63 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-public void onMove(PlayerMoveEvent e) {
-    if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
-    if (riftCenter == null) return;
+    public void onMove(PlayerMoveEvent e) {
+        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
+        if (riftCenter == null) return;
 
-    Player p = e.getPlayer();
-    Location to = e.getTo();
-    if (to == null) return;
+        Player p = e.getPlayer();
+        Location to = e.getTo();
+        if (to == null) return;
 
-    World w = riftCenter.getWorld();
-    if (w == null || !to.getWorld().equals(w)) return;
+        World w = riftCenter.getWorld();
+        if (w == null || !to.getWorld().equals(w)) return;
 
-    int cx = riftCenter.getBlockX();
-    int cz = riftCenter.getBlockZ();
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
 
-    int length = getConfig().getInt("rift.length", 22);
-    int halfWidth = getConfig().getInt("rift.half-width", 2);
+        int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-    boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 1);
-    boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 1);
+        boolean inZ = Math.abs(to.getBlockZ() - cz) <= (length / 2 + 1);
+        boolean inX = Math.abs(to.getBlockX() - cx) <= (halfWidth + 1);
 
-    if (!(inZ && inX)) return;
+        if (!(inZ && inX)) return;
 
-    // Не телепортировать, если игрок еще сверху над разломом
-    int riftTopY = riftCenter.getBlockY();
-    if (to.getY() >= (riftTopY - 0.2)) return;
+        int riftTopY = riftCenter.getBlockY();
+        if (to.getY() >= (riftTopY - 0.2)) return;
 
-    int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
-    if (to.getY() <= teleportY) {
-        Location safe = findSafeLocation(w);
-        p.teleport(safe);
-        p.playSound(safe, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.8f);
-        p.sendMessage("§5[Аномалия] §dТебя выбросило из разлома.");
+        int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
+        if (to.getY() <= teleportY) {
+            Location safe = findSafeLocation(w);
+            p.teleport(safe);
+            p.playSound(safe, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.8f);
+            p.sendMessage("§5[Аномалия] §dТебя выбросило из разлома.");
+        }
     }
-}
-@EventHandler
-public void onBreak(BlockBreakEvent e) {
-    if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
-    if (riftCenter == null) return;
-    if (!e.getBlock().getWorld().equals(riftCenter.getWorld())) return;
 
-    if (e.getPlayer().isOp()) return;
+    @EventHandler
+    public void onBreak(BlockBreakEvent e) {
+        if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
+        if (riftCenter == null) return;
+        if (!e.getBlock().getWorld().equals(riftCenter.getWorld())) return;
+        if (e.getPlayer().isOp()) return;
 
-    int cx = riftCenter.getBlockX();
-    int cz = riftCenter.getBlockZ();
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
 
-    int length = getConfig().getInt("rift.length", 22);
-    int halfWidth = getConfig().getInt("rift.half-width", 2);
-    int pad = getConfig().getInt("rift.protect-padding", 3);
+        int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
+        int pad = getConfig().getInt("rift.protect-padding", 3);
 
-    boolean inZ = Math.abs(e.getBlock().getZ() - cz) <= (length / 2 + pad);
-    boolean inX = Math.abs(e.getBlock().getX() - cx) <= (halfWidth + 1 + pad);
+        boolean inZ = Math.abs(e.getBlock().getZ() - cz) <= (length / 2 + pad);
+        boolean inX = Math.abs(e.getBlock().getX() - cx) <= (halfWidth + 1 + pad);
 
-    if (inZ && inX) {
-        e.setCancelled(true);
-        e.getPlayer().sendMessage("§cВ зоне разлома нельзя ломать блоки.");
+        if (inZ && inX) {
+            e.setCancelled(true);
+            e.getPlayer().sendMessage("§cВ зоне разлома нельзя ломать блоки.");
+        }
     }
-}
+
     private void help(CommandSender s) {
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
@@ -382,200 +375,217 @@ public void onBreak(BlockBreakEvent e) {
         if (enable) w.setTime(18000L);
     }
 
-private void buildRiftToBedrock(World w) {
-    int cx;
-    int cz;
+    private void buildRiftToBedrock(World w) {
+        int cx;
+        int cz;
 
-    if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
-        cx = getConfig().getInt("rift.center-x");
-        cz = getConfig().getInt("rift.center-z");
-    } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
-        cx = riftCenter.getBlockX();
-        cz = riftCenter.getBlockZ();
-    } else {
-        Location sp = w.getSpawnLocation();
-        cx = sp.getBlockX();
-        cz = sp.getBlockZ();
-    }
-
-    int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
-    int length = getConfig().getInt("rift.length", 22);
-    int halfWidth = getConfig().getInt("rift.half-width", 2);
-
-    riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
-    int minY = w.getMinHeight() + 1;
-
-    int maxOffset = Math.max(2, halfWidth + 2);
-    int pathX = cx;
-    int drift = 0;
-
-    for (int dz = -length / 2; dz <= length / 2; dz++) {
-        if (ThreadLocalRandom.current().nextInt(100) < 22) {
-            drift += ThreadLocalRandom.current().nextInt(-1, 2);
-            drift = Math.max(-1, Math.min(1, drift));
+        if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
+            cx = getConfig().getInt("rift.center-x");
+            cz = getConfig().getInt("rift.center-z");
+        } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
+            cx = riftCenter.getBlockX();
+            cz = riftCenter.getBlockZ();
+        } else {
+            Location sp = w.getSpawnLocation();
+            cx = sp.getBlockX();
+            cz = sp.getBlockZ();
         }
 
-        if (ThreadLocalRandom.current().nextInt(100) < 8) {
-            pathX += ThreadLocalRandom.current().nextInt(-1, 2);
-        }
+        int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
+        int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-        pathX += drift;
-        pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+        riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
+        int minY = w.getMinHeight() + 1;
 
-        int z = cz + dz;
+        int maxOffset = Math.max(2, halfWidth + 2);
+        int pathX = cx;
+        int drift = 0;
 
-        int crackHalf = 1; // 3 блока
-        if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2; // 5 блоков
-        if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3; // 7 блоков
+        for (int dz = -length / 2; dz <= length / 2; dz++) {
+            if (ThreadLocalRandom.current().nextInt(100) < 22) {
+                drift += ThreadLocalRandom.current().nextInt(-1, 2);
+                drift = Math.max(-1, Math.min(1, drift));
+            }
 
-        int cx1 = pathX - crackHalf;
-        int cx2 = pathX + crackHalf;
+            if (ThreadLocalRandom.current().nextInt(100) < 8) {
+                pathX += ThreadLocalRandom.current().nextInt(-1, 2);
+            }
 
-        for (int x = cx1; x <= cx2; x++) {
-            int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
+            pathX += drift;
+            pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
 
-            for (int y = startY; y >= minY; y--) {
-                Block b = w.getBlockAt(x, y, z);
-                Material m = b.getType();
+            int z = cz + dz;
 
-                if (m == Material.BEDROCK) continue;
+            int crackHalf = 1;
+            if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2;
+            if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3;
 
-                if (m != Material.AIR) {
-                    rememberBlock(b);
-                    b.setType(Material.AIR, false);
+            int cx1 = pathX - crackHalf;
+            int cx2 = pathX + crackHalf;
+
+            for (int x = cx1; x <= cx2; x++) {
+                int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
+
+                for (int y = startY; y >= minY; y--) {
+                    Block b = w.getBlockAt(x, y, z);
+                    Material m = b.getType();
+
+                    if (m == Material.BEDROCK) continue;
+
+                    if (m != Material.AIR) {
+                        rememberBlock(b);
+                        b.setType(Material.AIR, false);
+                    }
+                }
+
+                for (int y = topY + 4; y >= topY - 1; y--) {
+                    Block cap = w.getBlockAt(x, y, z);
+                    Material cm = cap.getType();
+                    if (cm == Material.SNOW
+                            || cm == Material.SNOW_BLOCK
+                            || cm == Material.TALL_GRASS
+                            || cm == Material.SHORT_GRASS) {
+                        rememberBlock(cap);
+                        cap.setType(Material.AIR, false);
+                    }
                 }
             }
 
-            for (int y = topY + 4; y >= topY - 1; y--) {
-                Block cap = w.getBlockAt(x, y, z);
-                Material cm = cap.getType();
-                if (cm == Material.SNOW
-                        || cm == Material.SNOW_BLOCK
-                        || cm == Material.TALL_GRASS
-                        || cm == Material.SHORT_GRASS) {
-                    rememberBlock(cap);
-                    cap.setType(Material.AIR, false);
-                }
+            decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
+
+            for (int y = topY - 6; y >= minY + 2; y -= 3) {
+                decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
             }
         }
 
-        decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
-        decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
+        Block core = w.getBlockAt(cx, topY - 1, cz);
+        rememberBlock(core);
+        core.setType(Material.CRYING_OBSIDIAN, false);
 
-        for (int y = topY - 6; y >= minY + 2; y -= 3) {
-            decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
-            decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
-        }
+        cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
+        w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
+
+        riftBuilt = true;
     }
 
-    Block core = w.getBlockAt(cx, topY - 1, cz);
-    rememberBlock(core);
-    core.setType(Material.CRYING_OBSIDIAN, false);
+    private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
+        int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
+        int up = getConfig().getInt("rift.cleanup-up", 20);
+        int down = getConfig().getInt("rift.cleanup-down", 2);
 
-    cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
-    w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
+        int minX = cx - (halfWidth + sidePad);
+        int maxX = cx + (halfWidth + sidePad);
+        int minZ = cz - (length / 2 + 1);
+        int maxZ = cz + (length / 2 + 1);
 
-    riftBuilt = true;
-}
-private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
-    int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
-    int up = getConfig().getInt("rift.cleanup-up", 20);
-    int down = getConfig().getInt("rift.cleanup-down", 2);
+        int minY = Math.max(w.getMinHeight(), topY - down);
+        int maxY = Math.min(w.getMaxHeight() - 1, topY + up);
 
-    int minX = cx - (halfWidth + sidePad);
-    int maxX = cx + (halfWidth + sidePad);
-    int minZ = cz - (length / 2 + 1);
-    int maxZ = cz + (length / 2 + 1);
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    Block b = w.getBlockAt(x, y, z);
+                    Material m = b.getType();
+                    String n = m.name();
 
-    int minY = Math.max(w.getMinHeight(), topY - down);
-    int maxY = Math.min(w.getMaxHeight() - 1, topY + up);
+                    boolean isVegetation =
+                            n.endsWith("_LOG") ||
+                            n.endsWith("_WOOD") ||
+                            n.endsWith("_LEAVES") ||
+                            n.equals("VINE") ||
+                            n.equals("CAVE_VINES") ||
+                            n.equals("CAVE_VINES_PLANT") ||
+                            n.equals("TWISTING_VINES") ||
+                            n.equals("TWISTING_VINES_PLANT") ||
+                            n.equals("WEEPING_VINES") ||
+                            n.equals("WEEPING_VINES_PLANT") ||
+                            n.equals("BAMBOO") ||
+                            n.equals("BAMBOO_SAPLING") ||
+                            n.equals("MANGROVE_ROOTS") ||
+                            n.equals("MUDDY_MANGROVE_ROOTS") ||
+                            n.equals("CHERRY_LEAVES") ||
+                            n.equals("SNOW") ||
+                            n.equals("SNOW_BLOCK");
 
-    for (int x = minX; x <= maxX; x++) {
-        for (int z = minZ; z <= maxZ; z++) {
-            for (int y = minY; y <= maxY; y++) {
-                Block b = w.getBlockAt(x, y, z);
-                Material m = b.getType();
-                String n = m.name();
-
-                boolean isVegetation =
-        n.endsWith("_LOG") ||
-        n.endsWith("_WOOD") ||
-        n.endsWith("_LEAVES") ||
-        n.equals("VINE") ||
-        n.equals("CAVE_VINES") ||
-        n.equals("CAVE_VINES_PLANT") ||
-        n.equals("TWISTING_VINES") ||
-        n.equals("TWISTING_VINES_PLANT") ||
-        n.equals("WEEPING_VINES") ||
-        n.equals("WEEPING_VINES_PLANT") ||
-        n.equals("BAMBOO") ||
-        n.equals("BAMBOO_SAPLING") ||
-        n.equals("MANGROVE_ROOTS") ||
-        n.equals("MUDDY_MANGROVE_ROOTS") ||
-        n.equals("CHERRY_LEAVES") ||
-        n.equals("SNOW") ||
-        n.equals("SNOW_BLOCK");
-
-                if (isVegetation) {
-                    rememberBlock(b);
-                    b.setType(Material.AIR, false);
+                    if (isVegetation) {
+                        rememberBlock(b);
+                        b.setType(Material.AIR, false);
+                    }
                 }
             }
         }
     }
-}
+
+    private void decorateEdge(Block b, int y, int minY) {
+        Material m;
+        int roll = ThreadLocalRandom.current().nextInt(100);
+
+        if (y <= minY + 8 && roll < 30) m = Material.LAVA;
+        else if (roll < 8) m = Material.SCULK;
+        else if (roll < 18) m = Material.CRYING_OBSIDIAN;
+        else if (roll < 55) m = Material.DEEPSLATE_TILES;
+        else m = Material.POLISHED_BLACKSTONE;
+
+        rememberBlock(b);
+        b.setType(m, false);
+    }
+
     private void decorateDepthEdge(Block b, int y, int minY) {
-    int roll = ThreadLocalRandom.current().nextInt(100);
-    Material m;
+        int roll = ThreadLocalRandom.current().nextInt(100);
+        Material m;
 
-    if (y <= minY + 12) {
-        if (roll < 45) m = Material.BLACKSTONE;
-        else if (roll < 75) m = Material.POLISHED_BLACKSTONE_BRICKS;
-        else if (roll < 90) m = Material.SCULK;
-        else m = Material.CRYING_OBSIDIAN;
-    } else {
-        if (roll < 35) m = Material.DEEPSLATE_BRICKS;
-        else if (roll < 65) m = Material.POLISHED_BLACKSTONE;
-        else if (roll < 85) m = Material.SCULK;
-        else m = Material.CRYING_OBSIDIAN;
-    }
-
-    rememberBlock(b);
-    b.setType(m, false);
-}
-
-private void spawnRiftParticles(World w) {
-    if (riftCenter == null) return;
-
-    int length = getConfig().getInt("rift.length", 22);
-    int cx = riftCenter.getBlockX();
-    int cz = riftCenter.getBlockZ();
-    int y = riftCenter.getBlockY();
-
-    for (int i = -length / 2; i <= length / 2; i++) {
-        double px = cx + ThreadLocalRandom.current().nextDouble(-2.2, 2.2);
-        double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
-        double py = y + ThreadLocalRandom.current().nextDouble(-1.5, 3.0);
-
-        w.spawnParticle(Particle.PORTAL, px, py, pz, 8, 0.25, 0.35, 0.25, 0.03);
-        w.spawnParticle(Particle.SOUL, px, py, pz, 4, 0.2, 0.3, 0.2, 0.01);
-        w.spawnParticle(Particle.SMOKE, px, py, pz, 5, 0.2, 0.25, 0.2, 0.002);
-
-        if (ThreadLocalRandom.current().nextInt(100) < 12) {
-            w.spawnParticle(Particle.SCULK_SOUL, px, py - 0.4, pz, 2, 0.1, 0.1, 0.1, 0.0);
+        if (y <= minY + 12) {
+            if (roll < 45) m = Material.BLACKSTONE;
+            else if (roll < 75) m = Material.POLISHED_BLACKSTONE_BRICKS;
+            else if (roll < 90) m = Material.SCULK;
+            else m = Material.CRYING_OBSIDIAN;
+        } else {
+            if (roll < 35) m = Material.DEEPSLATE_BRICKS;
+            else if (roll < 65) m = Material.POLISHED_BLACKSTONE;
+            else if (roll < 85) m = Material.SCULK;
+            else m = Material.CRYING_OBSIDIAN;
         }
-        if (ThreadLocalRandom.current().nextInt(100) < 8) {
-            w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.02);
+
+        rememberBlock(b);
+        b.setType(m, false);
+    }
+
+    private void spawnRiftParticles(World w) {
+        if (riftCenter == null) return;
+
+        int length = getConfig().getInt("rift.length", 22);
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
+        int y = riftCenter.getBlockY();
+
+        for (int i = -length / 2; i <= length / 2; i++) {
+            double px = cx + ThreadLocalRandom.current().nextDouble(-2.2, 2.2);
+            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
+            double py = y + ThreadLocalRandom.current().nextDouble(-1.5, 3.0);
+
+            w.spawnParticle(Particle.PORTAL, px, py, pz, 8, 0.25, 0.35, 0.25, 0.03);
+            w.spawnParticle(Particle.SOUL, px, py, pz, 4, 0.2, 0.3, 0.2, 0.01);
+            w.spawnParticle(Particle.SMOKE, px, py, pz, 5, 0.2, 0.25, 0.2, 0.002);
+
+            if (ThreadLocalRandom.current().nextInt(100) < 12) {
+                w.spawnParticle(Particle.SCULK_SOUL, px, py - 0.4, pz, 2, 0.1, 0.1, 0.1, 0.0);
+            }
+            if (ThreadLocalRandom.current().nextInt(100) < 8) {
+                w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.02);
+            }
+        }
+
+        if (ThreadLocalRandom.current().nextInt(100) < 10) {
+            w.playSound(riftCenter, Sound.AMBIENT_SOUL_SAND_VALLEY_MOOD, 0.8f, 0.6f);
+        }
+        if (ThreadLocalRandom.current().nextInt(100) < 6) {
+            w.playSound(riftCenter, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.5f, 0.7f);
         }
     }
 
-    if (ThreadLocalRandom.current().nextInt(100) < 10) {
-        w.playSound(riftCenter, Sound.AMBIENT_SOUL_SAND_VALLEY_MOOD, 0.8f, 0.6f);
-    }
-    if (ThreadLocalRandom.current().nextInt(100) < 6) {
-        w.playSound(riftCenter, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.5f, 0.7f);
-    }
-}
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
             String[] p = e.getKey().split(":");
@@ -670,6 +680,7 @@ private void spawnRiftParticles(World w) {
             }
         }, 20L, period);
     }
+
     private void startWeatherLockTask(World w) {
         stopWeatherLockTask();
         weatherLockTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
