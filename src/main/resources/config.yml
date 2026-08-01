@@ -1,0 +1,12 @@
+world: world
+
+effects:
+  fog:
+    enabled: false
+    refresh-ticks: 40
+    use-weakness: true
+
+state:
+  anomaly-enabled: false
+  storm-enabled: false
+  long-night-enabled: false
