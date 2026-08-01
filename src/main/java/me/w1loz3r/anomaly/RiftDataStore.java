@@ -52,9 +52,7 @@ public final class RiftDataStore {
             for (String key : yml.getConfigurationSection("blocks").getKeys(false)) {
                 String matName = yml.getString("blocks." + key, "STONE");
                 Material mat = Material.matchMaterial(matName);
-                if (mat != null) {
-                    out.changedBlocks.put(key, mat);
-                }
+                if (mat != null) out.changedBlocks.put(key, mat);
             }
         }
 
