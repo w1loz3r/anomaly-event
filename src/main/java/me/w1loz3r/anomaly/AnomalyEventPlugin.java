@@ -433,9 +433,41 @@ public void onBreak(BlockBreakEvent e) {
         core.setType(Material.CRYING_OBSIDIAN, false);
         cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
         w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
+        decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
         
         riftBuilt = true;
     }
+private void decorateRiftCaps(World w, int cx, int cz, int topY, int length, int halfWidth) {
+    int zMin = cz - (length / 2);
+    int zMax = cz + (length / 2);
+
+    // Толщина декора торца (в блоках)
+    int capDepth = 2;
+
+    // Декорируем оба торца: северный и южный
+    for (int x = cx - (halfWidth + 1); x <= cx + (halfWidth + 1); x++) {
+        for (int d = 0; d <= capDepth; d++) {
+            int zNorth = zMin - d;
+            int zSouth = zMax + d;
+
+            // Небольшая "зубчатость", чтобы выглядело естественнее
+            int localTop = topY - ThreadLocalRandom.current().nextInt(0, 2);
+
+            for (int y = localTop; y >= w.getMinHeight() + 1; y--) {
+                Block bn = w.getBlockAt(x, y, zNorth);
+                Block bs = w.getBlockAt(x, y, zSouth);
+
+                // Только если это контакт с пустотой разлома или рядом с ней
+                if (bn.getType() != Material.AIR) {
+                    decorateEdge(bn, y, w.getMinHeight() + 1);
+                }
+                if (bs.getType() != Material.AIR) {
+                    decorateEdge(bs, y, w.getMinHeight() + 1);
+                }
+            }
+        }
+    }
+}
 private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
     int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
     int up = getConfig().getInt("rift.cleanup-up", 20);
