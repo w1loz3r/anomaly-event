@@ -8,7 +8,15 @@ description: Rift/Anomaly event plugin with fog, storm and long night
 commands:
   anomaly:
     description: Control anomaly event
-    usage: /anomaly <on|off|storm|night|fog|status>
+    usage: |
+      /anomaly on
+      /anomaly off
+      /anomaly status
+      /anomaly fog <on|off|level 0-3>
+      /anomaly storm <on|off>
+      /anomaly night <on|off>
+      /anomaly rift size <length> <halfWidth> <jagged>
+      /anomaly rift rebuild
     permission: anomaly.admin
 
 permissions:
