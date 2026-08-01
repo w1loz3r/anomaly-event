@@ -382,96 +382,78 @@ public void onBreak(BlockBreakEvent e) {
         if (enable) w.setTime(18000L);
     }
 
-    private void buildRiftToBedrock(World w) {
-        Location spawn = w.getSpawnLocation();
-        int cx = spawn.getBlockX();
-        int cz = spawn.getBlockZ();
+private void buildRiftToBedrock(World w) {
+    int cx = getConfig().getInt("rift.center-x", 0);
+    int cz = getConfig().getInt("rift.center-z", 0);
+    int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
 
-        int minY = w.getMinHeight();
-        int topY = w.getHighestBlockYAt(cx, cz) + 1;
+    int length = getConfig().getInt("rift.length", 22);
+    int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-        int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-        int jagged = getConfig().getInt("rift.jagged", 2);
+    riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
+    int minY = w.getMinHeight() + 1;
 
-        riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
-int minY = w.getMinHeight() + 1;
+    // "Змейка" трещины: непрерывная ломаная линия по X при движении по Z
+    int maxOffset = Math.max(2, halfWidth + 2);
+    int pathX = cx;
+    int drift = 0;
 
-// "Змейка" трещины: непрерывная ломаная линия по X при движении по Z
-int maxOffset = Math.max(2, halfWidth + 2); // насколько далеко трещина может уйти от cx
-int pathX = cx;
-int drift = 0;
-
-for (int dz = -length / 2; dz <= length / 2; dz++) {
-    // Плавное изменение направления
-    if (ThreadLocalRandom.current().nextInt(100) < 22) {
-        drift += ThreadLocalRandom.current().nextInt(-1, 2); // -1..1
-        drift = Math.max(-1, Math.min(1, drift));
-    }
-
-    // Редкие "изломы" (как естественная трещина)
-    if (ThreadLocalRandom.current().nextInt(100) < 8) {
-        pathX += ThreadLocalRandom.current().nextInt(-1, 2);
-    }
-
-    pathX += drift;
-    pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
-
-    int z = cz + dz;
-
-    // Уже и стабильнее для маленьких размеров
-    int localHalf = halfWidth;
-    if (halfWidth <= 2) {
-        // для small делаем аккуратно: в основном 1-2 блока полуширины
-        localHalf = Math.max(1, halfWidth + (ThreadLocalRandom.current().nextInt(100) < 20 ? -1 : 0));
-    } else {
-        // для больших размеров немного вариативности
-        localHalf = Math.max(1, halfWidth + ThreadLocalRandom.current().nextInt(-1, 2));
-    }
-
-    int x1 = pathX - localHalf;
-    int x2 = pathX + localHalf;
-
-    // Прорезаем до бедрока
-    for (int x = x1; x <= x2; x++) {
-        int surfaceY = w.getHighestBlockYAt(x, z);
-
-        // Лёгкая неровность кромки сверху, но без жести
-        int cutTop = Math.min(topY, surfaceY) - ThreadLocalRandom.current().nextInt(0, 2);
-
-        for (int y = cutTop; y >= minY; y--) {
-            Block b = w.getBlockAt(x, y, z);
-            Material m = b.getType();
-            if (m == Material.BEDROCK) continue;
-            if (m != Material.AIR) rememberBlock(b);
-            b.setType(Material.AIR, false);
+    for (int dz = -length / 2; dz <= length / 2; dz++) {
+        // Плавное изменение направления
+        if (ThreadLocalRandom.current().nextInt(100) < 22) {
+            drift += ThreadLocalRandom.current().nextInt(-1, 2); // -1..1
+            drift = Math.max(-1, Math.min(1, drift));
         }
-    }
 
-    // Декор боковых кромок от фактической оси трещины
-    decorateEdge(w.getBlockAt(x1 - 1, topY, z), topY, minY);
-    decorateEdge(w.getBlockAt(x2 + 1, topY, z), topY, minY);
-}
- 
-                }
+        // Редкие "изломы"
+        if (ThreadLocalRandom.current().nextInt(100) < 8) {
+            pathX += ThreadLocalRandom.current().nextInt(-1, 2);
+        }
 
-                int edgeX1 = cx - dynamicHalfWidth - 1 + localShift;
-                int edgeX2 = cx + dynamicHalfWidth + 1 + localShift;
+        pathX += drift;
+        pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
 
-                decorateEdge(w.getBlockAt(edgeX1, y, cz + dz), y, minY);
-                decorateEdge(w.getBlockAt(edgeX2, y, cz + dz), y, minY);
+        int z = cz + dz;
+
+        int localHalf;
+        if (halfWidth <= 2) {
+            localHalf = Math.max(1, halfWidth + (ThreadLocalRandom.current().nextInt(100) < 20 ? -1 : 0));
+        } else {
+            localHalf = Math.max(1, halfWidth + ThreadLocalRandom.current().nextInt(-1, 2));
+        }
+
+        int x1 = pathX - localHalf;
+        int x2 = pathX + localHalf;
+
+        // Прорезаем до бедрока
+        for (int x = x1; x <= x2; x++) {
+            int surfaceY = w.getHighestBlockYAt(x, z);
+            int cutTop = Math.min(topY, surfaceY) - ThreadLocalRandom.current().nextInt(0, 2);
+
+            for (int y = cutTop; y >= minY; y--) {
+                Block b = w.getBlockAt(x, y, z);
+                Material m = b.getType();
+                if (m == Material.BEDROCK) continue;
+                if (m != Material.AIR) rememberBlock(b);
+                b.setType(Material.AIR, false);
             }
         }
 
-        Block core = w.getBlockAt(cx, topY - 1, cz);
-        rememberBlock(core);
-        core.setType(Material.CRYING_OBSIDIAN, false);
-        cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
-        w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
-        decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
-        
-        riftBuilt = true;
+        // Декор боковых кромок
+        decorateEdge(w.getBlockAt(x1 - 1, topY, z), topY, minY);
+        decorateEdge(w.getBlockAt(x2 + 1, topY, z), topY, minY);
     }
+
+    Block core = w.getBlockAt(cx, topY - 1, cz);
+    rememberBlock(core);
+    core.setType(Material.CRYING_OBSIDIAN, false);
+
+    cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
+    w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
+    decorateRiftCaps(w, cx, cz, topY, length, halfWidth);
+
+    riftBuilt = true;
+}
 private void decorateRiftCaps(World w, int cx, int cz, int topY, int length, int halfWidth) {
     int zMin = cz - (length / 2);
     int zMax = cz + (length / 2);
