@@ -15,7 +15,7 @@ commands:
       /anomaly fog <on|off|level 0-3>
       /anomaly storm <on|off>
       /anomaly night <on|off>
-      /anomaly rift size <length> <halfWidthTop> <jagged>
+      /anomaly rift size <length> <halfWidth> <jagged>
       /anomaly rift rebuild
     permission: anomaly.admin
 
