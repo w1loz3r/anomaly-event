@@ -519,14 +519,15 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         int oldHalfLen = oldLength / 2;
         int newHalfLen = newLength / 2;
+
         int maxOffset = Math.max(2, newHalfWidth + 2);
 
+        // 1) Если path пуст (после рестарта) — восстановим старую часть детерминированно
         if (riftPathX.isEmpty()) {
             int pathX = cx;
             int drift = 0;
             for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
-                long seed = 918273645L + dz * 1337L;
-                Random rr = new Random(seed);
+                Random rr = new Random(0x9E3779B97F4A7C15L + dz * 1315423911L);
 
                 if (rr.nextInt(100) < 22) {
                     drift += rr.nextInt(3) - 1;
@@ -542,30 +543,36 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
         }
 
-        for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
-            if (riftPathX.containsKey(dz)) continue;
+        // 2) ДОСТРАИВАЕМ path отдельно в плюс и минус от старых концов (это убирает "квадрат")
+        int leftStart = riftPathX.getOrDefault(-oldHalfLen, cx);
+        int rightStart = riftPathX.getOrDefault(oldHalfLen, cx);
 
-            int nearDz = (dz < -oldHalfLen) ? -oldHalfLen : oldHalfLen;
-            int prevDz = (dz < nearDz) ? dz + 1 : dz - 1;
-
-            int base = riftPathX.getOrDefault(prevDz, riftPathX.getOrDefault(nearDz, cx));
-
-            long seed = 918273645L + dz * 1337L;
-            Random rr = new Random(seed);
-
-            int step = rr.nextInt(3) - 1;
-            int px = base + step;
-            px = Math.max(cx - maxOffset, Math.min(cx + maxOffset, px));
-
-            riftPathX.put(dz, px);
+        // В +Z
+        int pxPos = rightStart;
+        for (int dz = oldHalfLen + 1; dz <= newHalfLen; dz++) {
+            Random rr = new Random(0xC2B2AE3D27D4EB4FL + dz * 2654435761L);
+            int step = rr.nextInt(3) - 1; // -1..1
+            pxPos += step;
+            pxPos = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pxPos));
+            riftPathX.put(dz, pxPos);
         }
 
+        // В -Z
+        int pxNeg = leftStart;
+        for (int dz = -oldHalfLen - 1; dz >= -newHalfLen; dz--) {
+            Random rr = new Random(0x165667B19E3779F9L + dz * 2246822519L);
+            int step = rr.nextInt(3) - 1; // -1..1
+            pxNeg += step;
+            pxNeg = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pxNeg));
+            riftPathX.put(dz, pxNeg);
+        }
+
+        // 3) Режем только новую добавку (длина и/или ширина) по pathX
         for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
             int pathX = riftPathX.getOrDefault(dz, cx);
             int z = cz + dz;
 
-            long seed = 1469598103934665603L ^ (long) dz * 1099511628211L;
-            Random r = new Random(seed);
+            Random r = new Random(0x94D049BB133111EBL + dz * 1099511628211L);
 
             int crackHalf = 1;
             if (r.nextInt(100) < 35) crackHalf = 2;
@@ -607,7 +614,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         cleanupVegetationAroundRift(w, cx, cz, topY, newLength, newHalfWidth);
     }
-
     private void carveRiftColumn(World w, int x, int z, int topY, int minY) {
         int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
 
