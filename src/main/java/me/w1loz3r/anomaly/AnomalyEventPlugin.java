@@ -201,6 +201,59 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     sender.sendMessage("§aНовый размер сохранен. Примени: §e/anomaly rift rebuild");
                     return true;
                 }
+                if (args[1].equalsIgnoreCase("expand")) {
+                    if (args.length < 4) {
+                        sender.sendMessage("§e/anomaly rift expand <+length> <+halfWidth>");
+                        return true;
+                    }
+                    
+                    Integer addLength = tryParseInt(args[2]);
+                    Integer addHalfWidth = tryParseInt(args[3]);
+
+                    if (addLength == null || addHalfWidth == null) {
+                        sender.sendMessage("§cЧисла введены неверно.");
+                        return true;
+                    }
+
+                    if (addLength < 0 || addHalfWidth < 0) {
+                        sender.sendMessage("§cИспользуй неотрицательные значения.");
+                        return true;
+                    }
+                    
+                    World w = targetWorld();
+                    if (w == null) {
+                        sender.sendMessage("§cМир не найден.");
+                        return true;
+                    }
+                    
+                    if (!riftBuilt || riftCenter == null) {
+                        sender.sendMessage("§cРазлом еще не построен. Сначала /anomaly on");
+                        return true;
+                    }
+                    
+                    int oldLength = getConfig().getInt("rift.length", 22);
+                    int oldHalfWidth = getConfig().getInt("rift.half-width", 2);
+                    
+                    int newLength = Math.min(300, oldLength + addLength);
+                    int newHalfWidth = Math.min(30, oldHalfWidth + addHalfWidth);
+                    
+                    if (newLength == oldLength && newHalfWidth == oldHalfWidth) {
+                        sender.sendMessage("§eНечего расширять (достигнут лимит или прибавка 0).");
+                        return true;
+                    }
+                    
+                    // расширяем только "добавку", не пересоздаем весь разлом
+                    expandRiftIncremental(w, oldLength, oldHalfWidth, newLength, newHalfWidth);
+                    
+                    getConfig().set("rift.length", newLength);
+                    getConfig().set("rift.half-width", newHalfWidth);
+                    saveConfig();
+                    saveRiftState();
+                    
+                    sender.sendMessage("§aРазлом расширен: length " + oldLength + " -> " + newLength
+                                       + ", halfWidth " + oldHalfWidth + " -> " + newHalfWidth);
+                    return true;
+                }
 
                 if (args[1].equalsIgnoreCase("rebuild")) {
                     World w = targetWorld();
@@ -479,6 +532,86 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     riftBuilt = true;
 }
+    private void expandRiftIncremental(World w, int oldLength, int oldHalfWidth, int newLength, int newHalfWidth) {
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
+        int topY = riftCenter.getBlockY();
+        int minY = w.getMinHeight() + 1;
+        
+        int oldHalfLen = oldLength / 2;
+        int newHalfLen = newLength / 2;
+        
+        // 1) расширение по длине (новые z-сегменты с двух концов)
+        for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
+            boolean isNewByLength = Math.abs(dz) > oldHalfLen;
+            if (!isNewByLength) continue;
+            
+            carveRiftSlice(w, cx, cz + dz, topY, minY, newHalfWidth);
+        }
+        
+        // 2) расширение по ширине в уже существующей длине
+        for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
+            int z = cz + dz;
+            
+            for (int x = cx - newHalfWidth; x <= cx + newHalfWidth; x++) {
+                boolean wasInsideOld = (x >= cx - oldHalfWidth && x <= cx + oldHalfWidth);
+                if (wasInsideOld) continue;
+                
+                carveRiftColumn(w, x, z, topY, minY);
+            }
+            
+            // декор краев нового размера
+            decorateEdge(w.getBlockAt(cx - newHalfWidth - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(cx + newHalfWidth + 1, topY, z), topY, minY);
+            
+            for (int y = topY - 2; y >= minY + 1; y--) {
+                decorateDepthEdge(w.getBlockAt(cx - newHalfWidth - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(cx + newHalfWidth + 1, y, z), y, minY);
+            }
+        }
+        
+        // 3) дочистка вокруг нового размера
+        cleanupVegetationAroundRift(w, cx, cz, topY, newLength, newHalfWidth);
+    }
+    private void carveRiftSlice(World w, int cx, int z, int topY, int minY, int halfWidth) {
+        for (int x = cx - halfWidth; x <= cx + halfWidth; x++) {
+            carveRiftColumn(w, x, z, topY, minY);
+        }
+        decorateEdge(w.getBlockAt(cx - halfWidth - 1, topY, z), topY, minY);
+        decorateEdge(w.getBlockAt(cx + halfWidth + 1, topY, z), topY, minY);
+        
+        for (int y = topY - 2; y >= minY + 1; y--) {
+            decorateDepthEdge(w.getBlockAt(cx - halfWidth - 1, y, z), y, minY);
+            decorateDepthEdge(w.getBlockAt(cx + halfWidth + 1, y, z), y, minY);
+        }
+    }
+    
+    private void carveRiftColumn(World w, int x, int z, int topY, int minY) {
+        int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
+        
+        for (int y = startY; y >= minY; y--) {
+            Block b = w.getBlockAt(x, y, z);
+            Material m = b.getType();
+            if (m == Material.BEDROCK) continue;
+            
+            if (m != Material.AIR) {
+                rememberBlock(b);
+                b.setType(Material.AIR, false);
+            }
+        }
+        
+        for (int y = topY + 4; y >= topY - 1; y--) {
+            Block cap = w.getBlockAt(x, y, z);
+            Material cm = cap.getType();
+            if (cm == Material.SNOW
+                || cm == Material.SNOW_BLOCK
+                || cm == Material.TALL_GRASS
+                || cm == Material.SHORT_GRASS) {
+                rememberBlock(cap);
+                cap.setType(Material.AIR, false);
+            }
+        }
+    }
     private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
         int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
         int up = getConfig().getInt("rift.cleanup-up", 20);
