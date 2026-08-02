@@ -348,6 +348,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void help(CommandSender s) {
+        s.sendMessage("§e/anomaly rift expand <+length> <+halfWidth>");
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
         s.sendMessage("§e/anomaly status");
