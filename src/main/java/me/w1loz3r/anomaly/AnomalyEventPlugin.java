@@ -520,15 +520,17 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int oldHalfLen = oldLength / 2;
         int newHalfLen = newLength / 2;
 
+        int addHalfLen = Math.max(0, newHalfLen - oldHalfLen);
+        int addWidth = Math.max(0, newHalfWidth - oldHalfWidth);
+
         int maxOffset = Math.max(2, newHalfWidth + 2);
 
-        // 1) Если path пуст (после рестарта) — восстановим старую часть детерминированно
+        // если path пуст (рестарт) — восстановить хотя бы старую длину
         if (riftPathX.isEmpty()) {
             int pathX = cx;
             int drift = 0;
             for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
                 Random rr = new Random(0x9E3779B97F4A7C15L + dz * 1315423911L);
-
                 if (rr.nextInt(100) < 22) {
                     drift += rr.nextInt(3) - 1;
                     drift = Math.max(-1, Math.min(1, drift));
@@ -536,79 +538,95 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 if (rr.nextInt(100) < 8) {
                     pathX += rr.nextInt(3) - 1;
                 }
-
                 pathX += drift;
                 pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
                 riftPathX.put(dz, pathX);
             }
         }
 
-        // 2) ДОСТРАИВАЕМ path отдельно в плюс и минус от старых концов (это убирает "квадрат")
-        int leftStart = riftPathX.getOrDefault(-oldHalfLen, cx);
-        int rightStart = riftPathX.getOrDefault(oldHalfLen, cx);
+        // ===== 1) ПРОДЛЯЕМ ТОЛЬКО КОНЦЫ (никакой массовой резки по всем dz) =====
 
-        // В +Z
-        int pxPos = rightStart;
-        for (int dz = oldHalfLen + 1; dz <= newHalfLen; dz++) {
-            Random rr = new Random(0xC2B2AE3D27D4EB4FL + dz * 2654435761L);
-            int step = rr.nextInt(3) - 1; // -1..1
-            pxPos += step;
-            pxPos = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pxPos));
-            riftPathX.put(dz, pxPos);
-        }
-
-        // В -Z
-        int pxNeg = leftStart;
-        for (int dz = -oldHalfLen - 1; dz >= -newHalfLen; dz--) {
-            Random rr = new Random(0x165667B19E3779F9L + dz * 2246822519L);
-            int step = rr.nextInt(3) - 1; // -1..1
-            pxNeg += step;
-            pxNeg = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pxNeg));
-            riftPathX.put(dz, pxNeg);
-        }
-
-        // 3) Режем только новую добавку (длина и/или ширина) по pathX
-        for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
-            int pathX = riftPathX.getOrDefault(dz, cx);
+        // +Z конец
+        int prevPosDz = oldHalfLen;
+        int prevPosX = riftPathX.getOrDefault(prevPosDz, cx);
+        for (int step = 1; step <= addHalfLen; step++) {
+            int dz = oldHalfLen + step;
             int z = cz + dz;
 
-            Random r = new Random(0x94D049BB133111EBL + dz * 1099511628211L);
+            Random rr = new Random(0xC2B2AE3D27D4EB4FL + dz * 2654435761L);
+            prevPosX += rr.nextInt(3) - 1;
+            prevPosX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, prevPosX));
+            riftPathX.put(dz, prevPosX);
 
             int crackHalf = 1;
-            if (r.nextInt(100) < 35) crackHalf = 2;
-            if (r.nextInt(100) < 10) crackHalf = 3;
+            if (rr.nextInt(100) < 35) crackHalf = 2;
+            if (rr.nextInt(100) < 10) crackHalf = 3;
 
-            int oldLeft = pathX - (oldHalfWidth + crackHalf);
-            int oldRight = pathX + (oldHalfWidth + crackHalf);
-            int newLeft = pathX - (newHalfWidth + crackHalf);
-            int newRight = pathX + (newHalfWidth + crackHalf);
+            int left = prevPosX - (newHalfWidth + crackHalf);
+            int right = prevPosX + (newHalfWidth + crackHalf);
 
-            boolean isNewByLength = Math.abs(dz) > oldHalfLen;
+            for (int x = left; x <= right; x++) carveRiftColumn(w, x, z, topY, minY);
 
-            if (isNewByLength) {
-                for (int x = newLeft; x <= newRight; x++) {
-                    carveRiftColumn(w, x, z, topY, minY);
-                }
-            } else {
-                for (int x = newLeft; x < oldLeft; x++) {
-                    carveRiftColumn(w, x, z, topY, minY);
-                }
-                for (int x = oldRight + 1; x <= newRight; x++) {
-                    carveRiftColumn(w, x, z, topY, minY);
-                }
-            }
-
-            decorateEdge(w.getBlockAt(newLeft - 1, topY, z), topY, minY);
-            decorateEdge(w.getBlockAt(newRight + 1, topY, z), topY, minY);
-
+            decorateEdge(w.getBlockAt(left - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(right + 1, topY, z), topY, minY);
             for (int y = topY - 2; y >= minY + 1; y--) {
-                decorateDepthEdge(w.getBlockAt(newLeft - 1, y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(newRight + 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(left - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(right + 1, y, z), y, minY);
+            }
+        }
 
-                if (r.nextInt(100) < 55) {
-                    decorateDepthEdge(w.getBlockAt(newLeft - 2, y, z), y, minY);
-                    decorateDepthEdge(w.getBlockAt(newRight + 2, y, z), y, minY);
-                }
+        // -Z конец
+        int prevNegDz = -oldHalfLen;
+        int prevNegX = riftPathX.getOrDefault(prevNegDz, cx);
+        for (int step = 1; step <= addHalfLen; step++) {
+            int dz = -oldHalfLen - step;
+            int z = cz + dz;
+
+            Random rr = new Random(0x165667B19E3779F9L + dz * 2246822519L);
+            prevNegX += rr.nextInt(3) - 1;
+            prevNegX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, prevNegX));
+            riftPathX.put(dz, prevNegX);
+
+            int crackHalf = 1;
+            if (rr.nextInt(100) < 35) crackHalf = 2;
+            if (rr.nextInt(100) < 10) crackHalf = 3;
+
+            int left = prevNegX - (newHalfWidth + crackHalf);
+            int right = prevNegX + (newHalfWidth + crackHalf);
+
+            for (int x = left; x <= right; x++) carveRiftColumn(w, x, z, topY, minY);
+
+            decorateEdge(w.getBlockAt(left - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(right + 1, topY, z), topY, minY);
+            for (int y = topY - 2; y >= minY + 1; y--) {
+                decorateDepthEdge(w.getBlockAt(left - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(right + 1, y, z), y, minY);
+            }
+        }
+
+        // ===== 2) РАСШИРЯЕМ ШИРИНУ ТОЛЬКО НА УЖЕ СУЩЕСТВУЮЩИХ dz ПУТИ =====
+        if (addWidth > 0) {
+            for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
+                Integer pathX = riftPathX.get(dz);
+                if (pathX == null) continue; // режем только там, где есть ось трещины
+
+                int z = cz + dz;
+
+                Random rr = new Random(0x94D049BB133111EBL + dz * 1099511628211L);
+                int crackHalf = 1;
+                if (rr.nextInt(100) < 35) crackHalf = 2;
+                if (rr.nextInt(100) < 10) crackHalf = 3;
+
+                int oldLeft = pathX - (oldHalfWidth + crackHalf);
+                int oldRight = pathX + (oldHalfWidth + crackHalf);
+                int newLeft = pathX - (newHalfWidth + crackHalf);
+                int newRight = pathX + (newHalfWidth + crackHalf);
+
+                for (int x = newLeft; x < oldLeft; x++) carveRiftColumn(w, x, z, topY, minY);
+                for (int x = oldRight + 1; x <= newRight; x++) carveRiftColumn(w, x, z, topY, minY);
+
+                decorateEdge(w.getBlockAt(newLeft - 1, topY, z), topY, minY);
+                decorateEdge(w.getBlockAt(newRight + 1, topY, z), topY, minY);
             }
         }
 
