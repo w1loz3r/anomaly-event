@@ -23,6 +23,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     private int hazardTaskId = -1;
 
     private final Map<String, Material> changedBlocks = new HashMap<>();
+    private final Map<Integer, Integer> riftPathX = new HashMap<>(); // dz -> pathX
+
     private Location riftCenter;
     private boolean riftBuilt = false;
 
@@ -170,7 +172,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
             case "rift" -> {
                 if (args.length < 2) {
-                    sender.sendMessage("§e/anomaly rift <size|rebuild>");
+                    sender.sendMessage("§e/anomaly rift <size|rebuild|expand>");
                     return true;
                 }
 
@@ -201,12 +203,13 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     sender.sendMessage("§aНовый размер сохранен. Примени: §e/anomaly rift rebuild");
                     return true;
                 }
+
                 if (args[1].equalsIgnoreCase("expand")) {
                     if (args.length < 4) {
                         sender.sendMessage("§e/anomaly rift expand <+length> <+halfWidth>");
                         return true;
                     }
-                    
+
                     Integer addLength = tryParseInt(args[2]);
                     Integer addHalfWidth = tryParseInt(args[3]);
 
@@ -219,39 +222,38 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                         sender.sendMessage("§cИспользуй неотрицательные значения.");
                         return true;
                     }
-                    
+
                     World w = targetWorld();
                     if (w == null) {
                         sender.sendMessage("§cМир не найден.");
                         return true;
                     }
-                    
+
                     if (!riftBuilt || riftCenter == null) {
                         sender.sendMessage("§cРазлом еще не построен. Сначала /anomaly on");
                         return true;
                     }
-                    
+
                     int oldLength = getConfig().getInt("rift.length", 22);
                     int oldHalfWidth = getConfig().getInt("rift.half-width", 2);
-                    
+
                     int newLength = Math.min(300, oldLength + addLength);
                     int newHalfWidth = Math.min(30, oldHalfWidth + addHalfWidth);
-                    
+
                     if (newLength == oldLength && newHalfWidth == oldHalfWidth) {
                         sender.sendMessage("§eНечего расширять (достигнут лимит или прибавка 0).");
                         return true;
                     }
-                    
-                    // расширяем только "добавку", не пересоздаем весь разлом
+
                     expandRiftIncremental(w, oldLength, oldHalfWidth, newLength, newHalfWidth);
-                    
+
                     getConfig().set("rift.length", newLength);
                     getConfig().set("rift.half-width", newHalfWidth);
                     saveConfig();
                     saveRiftState();
-                    
+
                     sender.sendMessage("§aРазлом расширен: length " + oldLength + " -> " + newLength
-                                       + ", halfWidth " + oldHalfWidth + " -> " + newHalfWidth);
+                            + ", halfWidth " + oldHalfWidth + " -> " + newHalfWidth);
                     return true;
                 }
 
@@ -279,7 +281,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     return true;
                 }
 
-                sender.sendMessage("§e/anomaly rift <size|rebuild>");
+                sender.sendMessage("§e/anomaly rift <size|rebuild|expand>");
                 return true;
             }
             default -> {
@@ -348,7 +350,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void help(CommandSender s) {
-        s.sendMessage("§e/anomaly rift expand <+length> <+halfWidth>");
         s.sendMessage("§e/anomaly on");
         s.sendMessage("§e/anomaly off");
         s.sendMessage("§e/anomaly status");
@@ -357,6 +358,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         s.sendMessage("§e/anomaly night <on|off>");
         s.sendMessage("§e/anomaly rift size <length> <halfWidth> <jagged>");
         s.sendMessage("§e/anomaly rift rebuild");
+        s.sendMessage("§e/anomaly rift expand <+length> <+halfWidth>");
     }
 
     private Integer tryParseInt(String s) {
@@ -430,144 +432,157 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void buildRiftToBedrock(World w) {
-    int cx;
-    int cz;
+        int cx;
+        int cz;
 
-    if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
-        cx = getConfig().getInt("rift.center-x");
-        cz = getConfig().getInt("rift.center-z");
-    } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
-        cx = riftCenter.getBlockX();
-        cz = riftCenter.getBlockZ();
-    } else {
-        Location sp = w.getSpawnLocation();
-        cx = sp.getBlockX();
-        cz = sp.getBlockZ();
-    }
-
-    int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
-    int length = getConfig().getInt("rift.length", 22);
-    int halfWidth = getConfig().getInt("rift.half-width", 2);
-
-    riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
-    int minY = w.getMinHeight() + 1;
-
-    int maxOffset = Math.max(2, halfWidth + 2);
-    int pathX = cx;
-    int drift = 0;
-
-    for (int dz = -length / 2; dz <= length / 2; dz++) {
-        if (ThreadLocalRandom.current().nextInt(100) < 22) {
-            drift += ThreadLocalRandom.current().nextInt(-1, 2);
-            drift = Math.max(-1, Math.min(1, drift));
+        if (getConfig().contains("rift.center-x") && getConfig().contains("rift.center-z")) {
+            cx = getConfig().getInt("rift.center-x");
+            cz = getConfig().getInt("rift.center-z");
+        } else if (riftCenter != null && riftCenter.getWorld().equals(w)) {
+            cx = riftCenter.getBlockX();
+            cz = riftCenter.getBlockZ();
+        } else {
+            Location sp = w.getSpawnLocation();
+            cx = sp.getBlockX();
+            cz = sp.getBlockZ();
         }
 
-        if (ThreadLocalRandom.current().nextInt(100) < 8) {
-            pathX += ThreadLocalRandom.current().nextInt(-1, 2);
-        }
+        int topY = getConfig().getInt("rift.top-y", w.getHighestBlockYAt(cx, cz));
+        int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-        pathX += drift;
-        pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+        riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
+        int minY = w.getMinHeight() + 1;
 
-        int z = cz + dz;
+        int maxOffset = Math.max(2, halfWidth + 2);
+        int pathX = cx;
+        int drift = 0;
 
-        int crackHalf = 1; // 3 блока
-        if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2; // 5
-        if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3; // 7
+        riftPathX.clear();
 
-        int cx1 = pathX - crackHalf;
-        int cx2 = pathX + crackHalf;
-
-        // Основной прорез
-        for (int x = cx1; x <= cx2; x++) {
-            int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
-
-            for (int y = startY; y >= minY; y--) {
-                Block b = w.getBlockAt(x, y, z);
-                Material m = b.getType();
-
-                if (m == Material.BEDROCK) continue;
-                if (m != Material.AIR) {
-                    rememberBlock(b);
-                    b.setType(Material.AIR, false);
-                }
+        for (int dz = -length / 2; dz <= length / 2; dz++) {
+            if (ThreadLocalRandom.current().nextInt(100) < 22) {
+                drift += ThreadLocalRandom.current().nextInt(-1, 2);
+                drift = Math.max(-1, Math.min(1, drift));
             }
 
-            // чистка поверхностного мусора
-            for (int y = topY + 4; y >= topY - 1; y--) {
-                Block cap = w.getBlockAt(x, y, z);
-                Material cm = cap.getType();
-                if (cm == Material.SNOW
-                        || cm == Material.SNOW_BLOCK
-                        || cm == Material.TALL_GRASS
-                        || cm == Material.SHORT_GRASS) {
-                    rememberBlock(cap);
-                    cap.setType(Material.AIR, false);
+            if (ThreadLocalRandom.current().nextInt(100) < 8) {
+                pathX += ThreadLocalRandom.current().nextInt(-1, 2);
+            }
+
+            pathX += drift;
+            pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+            riftPathX.put(dz, pathX);
+
+            int z = cz + dz;
+
+            int crackHalf = 1;
+            if (ThreadLocalRandom.current().nextInt(100) < 35) crackHalf = 2;
+            if (ThreadLocalRandom.current().nextInt(100) < 10) crackHalf = 3;
+
+            int cx1 = pathX - crackHalf;
+            int cx2 = pathX + crackHalf;
+
+            for (int x = cx1; x <= cx2; x++) {
+                carveRiftColumn(w, x, z, topY, minY);
+            }
+
+            decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
+
+            for (int y = topY - 2; y >= minY + 1; y--) {
+                decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
+
+                if (ThreadLocalRandom.current().nextInt(100) < 55) {
+                    decorateDepthEdge(w.getBlockAt(cx1 - 2, y, z), y, minY);
+                    decorateDepthEdge(w.getBlockAt(cx2 + 2, y, z), y, minY);
                 }
             }
         }
 
-        // Декор края у поверхности
-        decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
-        decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
+        Block core = w.getBlockAt(cx, topY - 1, cz);
+        rememberBlock(core);
+        core.setType(Material.CRYING_OBSIDIAN, false);
 
-        // Декор стен по всем уровням
-        for (int y = topY - 2; y >= minY + 1; y--) {
-            decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
-            decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
+        cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
+        w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
 
-            // второй пояс (плотность)
-            if (ThreadLocalRandom.current().nextInt(100) < 55) {
-                decorateDepthEdge(w.getBlockAt(cx1 - 2, y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(cx2 + 2, y, z), y, minY);
-            }
-        }
+        riftBuilt = true;
     }
 
-    Block core = w.getBlockAt(cx, topY - 1, cz);
-    rememberBlock(core);
-    core.setType(Material.CRYING_OBSIDIAN, false);
-
-    cleanupVegetationAroundRift(w, cx, cz, topY, length, halfWidth);
-    w.playSound(riftCenter, Sound.ENTITY_ENDER_DRAGON_GROWL, 1.2f, 0.7f);
-
-    riftBuilt = true;
-}
     private void expandRiftIncremental(World w, int oldLength, int oldHalfWidth, int newLength, int newHalfWidth) {
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
         int topY = riftCenter.getBlockY();
         int minY = w.getMinHeight() + 1;
-        
+
         int oldHalfLen = oldLength / 2;
         int newHalfLen = newLength / 2;
-        
-        // Без рандомного drift: центр разлома остается по cx
+        int maxOffset = Math.max(2, newHalfWidth + 2);
+
+        if (riftPathX.isEmpty()) {
+            int pathX = cx;
+            int drift = 0;
+            for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
+                long seed = 918273645L + dz * 1337L;
+                Random rr = new Random(seed);
+
+                if (rr.nextInt(100) < 22) {
+                    drift += rr.nextInt(3) - 1;
+                    drift = Math.max(-1, Math.min(1, drift));
+                }
+                if (rr.nextInt(100) < 8) {
+                    pathX += rr.nextInt(3) - 1;
+                }
+
+                pathX += drift;
+                pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+                riftPathX.put(dz, pathX);
+            }
+        }
+
         for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
+            if (riftPathX.containsKey(dz)) continue;
+
+            int nearDz = (dz < -oldHalfLen) ? -oldHalfLen : oldHalfLen;
+            int prevDz = (dz < nearDz) ? dz + 1 : dz - 1;
+
+            int base = riftPathX.getOrDefault(prevDz, riftPathX.getOrDefault(nearDz, cx));
+
+            long seed = 918273645L + dz * 1337L;
+            Random rr = new Random(seed);
+
+            int step = rr.nextInt(3) - 1;
+            int px = base + step;
+            px = Math.max(cx - maxOffset, Math.min(cx + maxOffset, px));
+
+            riftPathX.put(dz, px);
+        }
+
+        for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
+            int pathX = riftPathX.getOrDefault(dz, cx);
             int z = cz + dz;
-            
-            // Та же "рваность" ширины, но детерминированно от dz (стабильно между ребилдами)
+
             long seed = 1469598103934665603L ^ (long) dz * 1099511628211L;
             Random r = new Random(seed);
-            
+
             int crackHalf = 1;
             if (r.nextInt(100) < 35) crackHalf = 2;
             if (r.nextInt(100) < 10) crackHalf = 3;
-            
-            int oldLeft = cx - (oldHalfWidth + crackHalf);
-            int oldRight = cx + (oldHalfWidth + crackHalf);
-            int newLeft = cx - (newHalfWidth + crackHalf);
-            int newRight = cx + (newHalfWidth + crackHalf);
-            
+
+            int oldLeft = pathX - (oldHalfWidth + crackHalf);
+            int oldRight = pathX + (oldHalfWidth + crackHalf);
+            int newLeft = pathX - (newHalfWidth + crackHalf);
+            int newRight = pathX + (newHalfWidth + crackHalf);
+
             boolean isNewByLength = Math.abs(dz) > oldHalfLen;
-            
+
             if (isNewByLength) {
-                // Новый кусок длины: режем полностью новую ширину
                 for (int x = newLeft; x <= newRight; x++) {
                     carveRiftColumn(w, x, z, topY, minY);
                 }
             } else {
-                // Старая длина: режем только добавленные полосы ширины
                 for (int x = newLeft; x < oldLeft; x++) {
                     carveRiftColumn(w, x, z, topY, minY);
                 }
@@ -575,63 +590,51 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     carveRiftColumn(w, x, z, topY, minY);
                 }
             }
-            
-            // Декор новой кромки
+
             decorateEdge(w.getBlockAt(newLeft - 1, topY, z), topY, minY);
             decorateEdge(w.getBlockAt(newRight + 1, topY, z), topY, minY);
-            
+
             for (int y = topY - 2; y >= minY + 1; y--) {
                 decorateDepthEdge(w.getBlockAt(newLeft - 1, y, z), y, minY);
                 decorateDepthEdge(w.getBlockAt(newRight + 1, y, z), y, minY);
-                
+
                 if (r.nextInt(100) < 55) {
                     decorateDepthEdge(w.getBlockAt(newLeft - 2, y, z), y, minY);
                     decorateDepthEdge(w.getBlockAt(newRight + 2, y, z), y, minY);
                 }
             }
         }
-        
+
         cleanupVegetationAroundRift(w, cx, cz, topY, newLength, newHalfWidth);
     }
-    private void carveRiftSlice(World w, int cx, int z, int topY, int minY, int halfWidth) {
-        for (int x = cx - halfWidth; x <= cx + halfWidth; x++) {
-            carveRiftColumn(w, x, z, topY, minY);
-        }
-        decorateEdge(w.getBlockAt(cx - halfWidth - 1, topY, z), topY, minY);
-        decorateEdge(w.getBlockAt(cx + halfWidth + 1, topY, z), topY, minY);
-        
-        for (int y = topY - 2; y >= minY + 1; y--) {
-            decorateDepthEdge(w.getBlockAt(cx - halfWidth - 1, y, z), y, minY);
-            decorateDepthEdge(w.getBlockAt(cx + halfWidth + 1, y, z), y, minY);
-        }
-    }
-    
+
     private void carveRiftColumn(World w, int x, int z, int topY, int minY) {
         int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
-        
+
         for (int y = startY; y >= minY; y--) {
             Block b = w.getBlockAt(x, y, z);
             Material m = b.getType();
             if (m == Material.BEDROCK) continue;
-            
+
             if (m != Material.AIR) {
                 rememberBlock(b);
                 b.setType(Material.AIR, false);
             }
         }
-        
+
         for (int y = topY + 4; y >= topY - 1; y--) {
             Block cap = w.getBlockAt(x, y, z);
             Material cm = cap.getType();
             if (cm == Material.SNOW
-                || cm == Material.SNOW_BLOCK
-                || cm == Material.TALL_GRASS
-                || cm == Material.SHORT_GRASS) {
+                    || cm == Material.SNOW_BLOCK
+                    || cm == Material.TALL_GRASS
+                    || cm == Material.SHORT_GRASS) {
                 rememberBlock(cap);
                 cap.setType(Material.AIR, false);
             }
         }
     }
+
     private void cleanupVegetationAroundRift(World w, int cx, int cz, int topY, int length, int halfWidth) {
         int sidePad = getConfig().getInt("rift.cleanup-side-pad", 4);
         int up = getConfig().getInt("rift.cleanup-up", 20);
@@ -654,22 +657,22 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
                     boolean isVegetation =
                             n.endsWith("_LOG") ||
-                            n.endsWith("_WOOD") ||
-                            n.endsWith("_LEAVES") ||
-                            n.equals("VINE") ||
-                            n.equals("CAVE_VINES") ||
-                            n.equals("CAVE_VINES_PLANT") ||
-                            n.equals("TWISTING_VINES") ||
-                            n.equals("TWISTING_VINES_PLANT") ||
-                            n.equals("WEEPING_VINES") ||
-                            n.equals("WEEPING_VINES_PLANT") ||
-                            n.equals("BAMBOO") ||
-                            n.equals("BAMBOO_SAPLING") ||
-                            n.equals("MANGROVE_ROOTS") ||
-                            n.equals("MUDDY_MANGROVE_ROOTS") ||
-                            n.equals("CHERRY_LEAVES") ||
-                            n.equals("SNOW") ||
-                            n.equals("SNOW_BLOCK");
+                                    n.endsWith("_WOOD") ||
+                                    n.endsWith("_LEAVES") ||
+                                    n.equals("VINE") ||
+                                    n.equals("CAVE_VINES") ||
+                                    n.equals("CAVE_VINES_PLANT") ||
+                                    n.equals("TWISTING_VINES") ||
+                                    n.equals("TWISTING_VINES_PLANT") ||
+                                    n.equals("WEEPING_VINES") ||
+                                    n.equals("WEEPING_VINES_PLANT") ||
+                                    n.equals("BAMBOO") ||
+                                    n.equals("BAMBOO_SAPLING") ||
+                                    n.equals("MANGROVE_ROOTS") ||
+                                    n.equals("MUDDY_MANGROVE_ROOTS") ||
+                                    n.equals("CHERRY_LEAVES") ||
+                                    n.equals("SNOW") ||
+                                    n.equals("SNOW_BLOCK");
 
                     if (isVegetation) {
                         rememberBlock(b);
@@ -681,85 +684,79 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     }
 
     private void spawnRiftParticles(World w) {
-    if (riftCenter == null) return;
+        if (riftCenter == null) return;
 
-    int length = getConfig().getInt("rift.length", 22);
-    int cx = riftCenter.getBlockX();
-    int cz = riftCenter.getBlockZ();
-    int y = riftCenter.getBlockY();
+        int length = getConfig().getInt("rift.length", 22);
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
+        int y = riftCenter.getBlockY();
 
-    for (int i = -length / 2; i <= length / 2; i++) {
-        double px = cx + ThreadLocalRandom.current().nextDouble(-2.0, 2.0);
-        double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
-        double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
+        for (int i = -length / 2; i <= length / 2; i++) {
+            double px = cx + ThreadLocalRandom.current().nextDouble(-2.0, 2.0);
+            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
+            double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
 
-        w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
-        w.spawnParticle(Particle.SOUL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.01);
-        w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
+            w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
+            w.spawnParticle(Particle.SOUL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.01);
+            w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
 
-        if (ThreadLocalRandom.current().nextInt(100) < 8) {
-            w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 2, 0.1, 0.15, 0.1, 0.02);
+            if (ThreadLocalRandom.current().nextInt(100) < 8) {
+                w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 2, 0.1, 0.15, 0.1, 0.02);
+            }
         }
     }
-}
+
     private void decorateEdge(Block b, int y, int minY) {
-    Material cur = b.getType();
+        Material cur = b.getType();
 
-    // Только реальная стенка
-    if (cur == Material.AIR || cur == Material.BEDROCK || cur == Material.WATER || cur == Material.LAVA) return;
+        if (cur == Material.AIR || cur == Material.BEDROCK || cur == Material.WATER || cur == Material.LAVA) return;
 
-    int roll = ThreadLocalRandom.current().nextInt(100);
-    Material m;
+        int roll = ThreadLocalRandom.current().nextInt(100);
+        Material m;
 
-    if (y <= minY + 8 && roll < 25) m = Material.LAVA;
-    else if (roll < 12) m = Material.SCULK;
-    else if (roll < 24) m = Material.CRYING_OBSIDIAN;
-    else if (roll < 62) m = Material.DEEPSLATE_TILES;
-    else m = Material.POLISHED_BLACKSTONE;
+        if (y <= minY + 8 && roll < 25) m = Material.LAVA;
+        else if (roll < 12) m = Material.SCULK;
+        else if (roll < 24) m = Material.CRYING_OBSIDIAN;
+        else if (roll < 62) m = Material.DEEPSLATE_TILES;
+        else m = Material.POLISHED_BLACKSTONE;
 
-    if (cur == m) return;
-    rememberBlock(b);
-    b.setType(m, false);
-}
-
-private void decorateDepthEdge(Block b, int y, int minY) {
-    Material cur = b.getType();
-
-    // Меняем только стену
-    if (cur == Material.AIR || cur == Material.BEDROCK || cur == Material.LAVA || cur == Material.WATER) return;
-
-    int roll = ThreadLocalRandom.current().nextInt(100);
-    Material m;
-
-    // Нижний слой
-    if (y <= minY + 12) {
-        if (roll < 40) m = Material.BLACKSTONE;
-        else if (roll < 70) m = Material.POLISHED_BLACKSTONE_BRICKS;
-        else if (roll < 85) m = Material.SCULK;
-        else if (roll < 95) m = Material.CRYING_OBSIDIAN;
-        else m = Material.MAGMA_BLOCK;
-    }
-    // Средний слой
-    else if (y <= minY + 35) {
-        if (roll < 35) m = Material.DEEPSLATE_BRICKS;
-        else if (roll < 60) m = Material.DEEPSLATE_TILES;
-        else if (roll < 80) m = Material.POLISHED_BLACKSTONE;
-        else if (roll < 92) m = Material.SCULK;
-        else m = Material.CRYING_OBSIDIAN;
-    }
-    // Верхний слой
-    else {
-        if (roll < 45) m = Material.DEEPSLATE;
-        else if (roll < 70) m = Material.COBBLED_DEEPSLATE;
-        else if (roll < 85) m = Material.DEEPSLATE_TILES;
-        else if (roll < 95) m = Material.POLISHED_BLACKSTONE;
-        else m = Material.CRYING_OBSIDIAN;
+        if (cur == m) return;
+        rememberBlock(b);
+        b.setType(m, false);
     }
 
-    if (cur == m) return;
-    rememberBlock(b);
-    b.setType(m, false);
-}
+    private void decorateDepthEdge(Block b, int y, int minY) {
+        Material cur = b.getType();
+
+        if (cur == Material.AIR || cur == Material.BEDROCK || cur == Material.LAVA || cur == Material.WATER) return;
+
+        int roll = ThreadLocalRandom.current().nextInt(100);
+        Material m;
+
+        if (y <= minY + 12) {
+            if (roll < 40) m = Material.BLACKSTONE;
+            else if (roll < 70) m = Material.POLISHED_BLACKSTONE_BRICKS;
+            else if (roll < 85) m = Material.SCULK;
+            else if (roll < 95) m = Material.CRYING_OBSIDIAN;
+            else m = Material.MAGMA_BLOCK;
+        } else if (y <= minY + 35) {
+            if (roll < 35) m = Material.DEEPSLATE_BRICKS;
+            else if (roll < 60) m = Material.DEEPSLATE_TILES;
+            else if (roll < 80) m = Material.POLISHED_BLACKSTONE;
+            else if (roll < 92) m = Material.SCULK;
+            else m = Material.CRYING_OBSIDIAN;
+        } else {
+            if (roll < 45) m = Material.DEEPSLATE;
+            else if (roll < 70) m = Material.COBBLED_DEEPSLATE;
+            else if (roll < 85) m = Material.DEEPSLATE_TILES;
+            else if (roll < 95) m = Material.POLISHED_BLACKSTONE;
+            else m = Material.CRYING_OBSIDIAN;
+        }
+
+        if (cur == m) return;
+        rememberBlock(b);
+        b.setType(m, false);
+    }
 
     private void restoreRift(World w) {
         for (Map.Entry<String, Material> e : changedBlocks.entrySet()) {
@@ -771,6 +768,7 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         }
 
         changedBlocks.clear();
+        riftPathX.clear();
         riftBuilt = false;
         riftCenter = null;
     }
