@@ -542,36 +542,55 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int oldHalfLen = oldLength / 2;
         int newHalfLen = newLength / 2;
         
-        // 1) расширение по длине (новые z-сегменты с двух концов)
+        // Без рандомного drift: центр разлома остается по cx
         for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
-            boolean isNewByLength = Math.abs(dz) > oldHalfLen;
-            if (!isNewByLength) continue;
-            
-            carveRiftSlice(w, cx, cz + dz, topY, minY, newHalfWidth);
-        }
-        
-        // 2) расширение по ширине в уже существующей длине
-        for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
             int z = cz + dz;
             
-            for (int x = cx - newHalfWidth; x <= cx + newHalfWidth; x++) {
-                boolean wasInsideOld = (x >= cx - oldHalfWidth && x <= cx + oldHalfWidth);
-                if (wasInsideOld) continue;
-                
-                carveRiftColumn(w, x, z, topY, minY);
+            // Та же "рваность" ширины, но детерминированно от dz (стабильно между ребилдами)
+            long seed = 1469598103934665603L ^ (long) dz * 1099511628211L;
+            Random r = new Random(seed);
+            
+            int crackHalf = 1;
+            if (r.nextInt(100) < 35) crackHalf = 2;
+            if (r.nextInt(100) < 10) crackHalf = 3;
+            
+            int oldLeft = cx - (oldHalfWidth + crackHalf);
+            int oldRight = cx + (oldHalfWidth + crackHalf);
+            int newLeft = cx - (newHalfWidth + crackHalf);
+            int newRight = cx + (newHalfWidth + crackHalf);
+            
+            boolean isNewByLength = Math.abs(dz) > oldHalfLen;
+            
+            if (isNewByLength) {
+                // Новый кусок длины: режем полностью новую ширину
+                for (int x = newLeft; x <= newRight; x++) {
+                    carveRiftColumn(w, x, z, topY, minY);
+                }
+            } else {
+                // Старая длина: режем только добавленные полосы ширины
+                for (int x = newLeft; x < oldLeft; x++) {
+                    carveRiftColumn(w, x, z, topY, minY);
+                }
+                for (int x = oldRight + 1; x <= newRight; x++) {
+                    carveRiftColumn(w, x, z, topY, minY);
+                }
             }
             
-            // декор краев нового размера
-            decorateEdge(w.getBlockAt(cx - newHalfWidth - 1, topY, z), topY, minY);
-            decorateEdge(w.getBlockAt(cx + newHalfWidth + 1, topY, z), topY, minY);
+            // Декор новой кромки
+            decorateEdge(w.getBlockAt(newLeft - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(newRight + 1, topY, z), topY, minY);
             
             for (int y = topY - 2; y >= minY + 1; y--) {
-                decorateDepthEdge(w.getBlockAt(cx - newHalfWidth - 1, y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(cx + newHalfWidth + 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(newLeft - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(newRight + 1, y, z), y, minY);
+                
+                if (r.nextInt(100) < 55) {
+                    decorateDepthEdge(w.getBlockAt(newLeft - 2, y, z), y, minY);
+                    decorateDepthEdge(w.getBlockAt(newRight + 2, y, z), y, minY);
+                }
             }
         }
         
-        // 3) дочистка вокруг нового размера
         cleanupVegetationAroundRift(w, cx, cz, topY, newLength, newHalfWidth);
     }
     private void carveRiftSlice(World w, int cx, int z, int topY, int minY, int halfWidth) {
