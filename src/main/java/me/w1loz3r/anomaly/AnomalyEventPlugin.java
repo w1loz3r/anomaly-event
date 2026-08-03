@@ -24,6 +24,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     private final Map<String, Material> changedBlocks = new HashMap<>();
     private final Map<Integer, Integer> riftPathX = new HashMap<>(); // dz -> pathX
+    private final Map<Integer, Integer> riftPathX = new HashMap<>(); // dz -> x оси трещины
+    private final Set<Integer> activeDz = new HashSet<>();
 
     private Location riftCenter;
     private boolean riftBuilt = false;
@@ -245,7 +247,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                         return true;
                     }
 
-                    expandRiftIncremental(w, oldLength, oldHalfWidth, newLength, newHalfWidth);
+                    growRiftSmart(w, oldLength, oldHalfWidth, newLength, newHalfWidth);
 
                     getConfig().set("rift.length", newLength);
                     getConfig().set("rift.half-width", newHalfWidth);
@@ -267,7 +269,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     boolean wasEnabled = getConfig().getBoolean("state.anomaly-enabled", false);
 
                     if (riftBuilt) {
-                        restoreRift(w);
+                        (w);
                         dataStore.clear();
                     }
 
@@ -459,6 +461,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int drift = 0;
 
         riftPathX.clear();
+        riftPathX.put(dz, pathX);
+        activeDz.add(dz);
 
         for (int dz = -length / 2; dz <= length / 2; dz++) {
             if (ThreadLocalRandom.current().nextInt(100) < 22) {
@@ -473,6 +477,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             pathX += drift;
             pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
             riftPathX.put(dz, pathX);
+            activeDz.add(dz);
 
             int z = cz + dz;
 
@@ -510,8 +515,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         riftBuilt = true;
     }
-
-    private void expandRiftIncremental(World w, int oldLength, int oldHalfWidth, int newLength, int newHalfWidth) {
+    private void growRiftSmart(World w, int oldLength, int oldHalfWidth, int newLength, int newHalfWidth) {
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
         int topY = riftCenter.getBlockY();
@@ -520,15 +524,15 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int oldHalfLen = oldLength / 2;
         int newHalfLen = newLength / 2;
 
-        int addHalfLen = Math.max(0, newHalfLen - oldHalfLen);
-        int addWidth = Math.max(0, newHalfWidth - oldHalfWidth);
+        int targetMinDz = -newHalfLen;
+        int targetMaxDz = newHalfLen;
 
-        int maxOffset = Math.max(2, newHalfWidth + 2);
-
-        // если path пуст (рестарт) — восстановить хотя бы старую длину
+    // 1) если после рестарта пусто — восстановим базовую ось
         if (riftPathX.isEmpty()) {
             int pathX = cx;
             int drift = 0;
+            int maxOffset = Math.max(2, newHalfWidth + 2);
+
             for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
                 Random rr = new Random(0x9E3779B97F4A7C15L + dz * 1315423911L);
                 if (rr.nextInt(100) < 22) {
@@ -536,91 +540,71 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     drift = Math.max(-1, Math.min(1, drift));
                 }
                 if (rr.nextInt(100) < 8) {
-                    pathX += rr.nextInt(3) - 1;
+                pathX += rr.nextInt(3) - 1;
                 }
                 pathX += drift;
                 pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
                 riftPathX.put(dz, pathX);
+                activeDz.add(dz);
             }
         }
 
-        // ===== 1) ПРОДЛЯЕМ ТОЛЬКО КОНЦЫ (никакой массовой резки по всем dz) =====
+        // 2) наращиваем КОНЕЦ +Z
+        int curMaxDz = activeDz.stream().max(Integer::compareTo).orElse(oldHalfLen);
+        int curMaxX = riftPathX.getOrDefault(curMaxDz, cx);
+        int maxOffset = Math.max(2, newHalfWidth + 2);
 
-        // +Z конец
-        int prevPosDz = oldHalfLen;
-        int prevPosX = riftPathX.getOrDefault(prevPosDz, cx);
-        for (int step = 1; step <= addHalfLen; step++) {
-            int dz = oldHalfLen + step;
-            int z = cz + dz;
+        while (curMaxDz < targetMaxDz) {
+            int nextDz = curMaxDz + 1;
+            int z = cz + nextDz;
 
-            Random rr = new Random(0xC2B2AE3D27D4EB4FL + dz * 2654435761L);
-            prevPosX += rr.nextInt(3) - 1;
-            prevPosX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, prevPosX));
-            riftPathX.put(dz, prevPosX);
+            Random rr = new Random(0xC2B2AE3D27D4EB4FL + nextDz * 2654435761L);
+            int step = rr.nextInt(100) < 70 ? 0 : (rr.nextBoolean() ? 1 : -1); // чаще прямо, иногда сдвиг
+            curMaxX += step;
+            curMaxX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, curMaxX));
 
-            int crackHalf = 1;
-            if (rr.nextInt(100) < 35) crackHalf = 2;
-            if (rr.nextInt(100) < 10) crackHalf = 3;
+            riftPathX.put(nextDz, curMaxX);
+            activeDz.add(nextDz);
 
-            int left = prevPosX - (newHalfWidth + crackHalf);
-            int right = prevPosX + (newHalfWidth + crackHalf);
-
-            for (int x = left; x <= right; x++) carveRiftColumn(w, x, z, topY, minY);
-
-            decorateEdge(w.getBlockAt(left - 1, topY, z), topY, minY);
-            decorateEdge(w.getBlockAt(right + 1, topY, z), topY, minY);
-            for (int y = topY - 2; y >= minY + 1; y--) {
-                decorateDepthEdge(w.getBlockAt(left - 1, y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(right + 1, y, z), y, minY);
-            }
+            int crackHalf = pickCrackHalf(rr);
+            carveSliceAt(w, curMaxX, z, topY, minY, newHalfWidth, crackHalf, true);
+            curMaxDz = nextDz;
         }
 
-        // -Z конец
-        int prevNegDz = -oldHalfLen;
-        int prevNegX = riftPathX.getOrDefault(prevNegDz, cx);
-        for (int step = 1; step <= addHalfLen; step++) {
-            int dz = -oldHalfLen - step;
-            int z = cz + dz;
+        // 3) наращиваем КОНЕЦ -Z
+        int curMinDz = activeDz.stream().min(Integer::compareTo).orElse(-oldHalfLen);
+        int curMinX = riftPathX.getOrDefault(curMinDz, cx);
 
-            Random rr = new Random(0x165667B19E3779F9L + dz * 2246822519L);
-            prevNegX += rr.nextInt(3) - 1;
-            prevNegX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, prevNegX));
-            riftPathX.put(dz, prevNegX);
+        while (curMinDz > targetMinDz) {
+            int nextDz = curMinDz - 1;
+            int z = cz + nextDz;
 
-            int crackHalf = 1;
-            if (rr.nextInt(100) < 35) crackHalf = 2;
-            if (rr.nextInt(100) < 10) crackHalf = 3;
+            Random rr = new Random(0x165667B19E3779F9L + nextDz * 2246822519L);
+            int step = rr.nextInt(100) < 70 ? 0 : (rr.nextBoolean() ? 1 : -1);
+            curMinX += step;
+            curMinX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, curMinX));
 
-            int left = prevNegX - (newHalfWidth + crackHalf);
-            int right = prevNegX + (newHalfWidth + crackHalf);
+            riftPathX.put(nextDz, curMinX);
+            activeDz.add(nextDz);
 
-            for (int x = left; x <= right; x++) carveRiftColumn(w, x, z, topY, minY);
-
-            decorateEdge(w.getBlockAt(left - 1, topY, z), topY, minY);
-            decorateEdge(w.getBlockAt(right + 1, topY, z), topY, minY);
-            for (int y = topY - 2; y >= minY + 1; y--) {
-                decorateDepthEdge(w.getBlockAt(left - 1, y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(right + 1, y, z), y, minY);
-            }
+            int crackHalf = pickCrackHalf(rr);
+            carveSliceAt(w, curMinX, z, topY, minY, newHalfWidth, crackHalf, true);
+            curMinDz = nextDz;
         }
 
-        // ===== 2) РАСШИРЯЕМ ШИРИНУ ТОЛЬКО НА УЖЕ СУЩЕСТВУЮЩИХ dz ПУТИ =====
-        if (addWidth > 0) {
-            for (int dz = -newHalfLen; dz <= newHalfLen; dz++) {
-                Integer pathX = riftPathX.get(dz);
-                if (pathX == null) continue; // режем только там, где есть ось трещины
-
+        // 4) локальное утолщение на уже существующих сегментах (без квадрата)
+        if (newHalfWidth > oldHalfWidth) {
+            for (int dz : new ArrayList<>(activeDz)) {
+                int xCenter = riftPathX.getOrDefault(dz, cx);
                 int z = cz + dz;
 
                 Random rr = new Random(0x94D049BB133111EBL + dz * 1099511628211L);
-                int crackHalf = 1;
-                if (rr.nextInt(100) < 35) crackHalf = 2;
-                if (rr.nextInt(100) < 10) crackHalf = 3;
+                int crackHalf = pickCrackHalf(rr);
 
-                int oldLeft = pathX - (oldHalfWidth + crackHalf);
-                int oldRight = pathX + (oldHalfWidth + crackHalf);
-                int newLeft = pathX - (newHalfWidth + crackHalf);
-                int newRight = pathX + (newHalfWidth + crackHalf);
+                int oldLeft = xCenter - (oldHalfWidth + crackHalf);
+                int oldRight = xCenter + (oldHalfWidth + crackHalf);
+                int newLeft = xCenter - (newHalfWidth + crackHalf);
+                int newRight = xCenter + (newHalfWidth + crackHalf);
 
                 for (int x = newLeft; x < oldLeft; x++) carveRiftColumn(w, x, z, topY, minY);
                 for (int x = oldRight + 1; x <= newRight; x++) carveRiftColumn(w, x, z, topY, minY);
@@ -631,6 +615,32 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         }
 
         cleanupVegetationAroundRift(w, cx, cz, topY, newLength, newHalfWidth);
+    }
+
+    private int pickCrackHalf(Random r) {
+        int crackHalf = 1;
+        if (r.nextInt(100) < 35) crackHalf = 2;
+        if (r.nextInt(100) < 10) crackHalf = 3;
+        return crackHalf;
+    }
+
+    private void carveSliceAt(World w, int xCenter, int z, int topY, int minY, int halfWidth, int crackHalf, boolean withDecor) {
+        int left = xCenter - (halfWidth + crackHalf);
+        int right = xCenter + (halfWidth + crackHalf);
+
+        for (int x = left; x <= right; x++) {
+            carveRiftColumn(w, x, z, topY, minY);
+        }
+
+        if (withDecor) {
+            decorateEdge(w.getBlockAt(left - 1, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(right + 1, topY, z), topY, minY);
+
+            for (int y = topY - 2; y >= minY + 1; y--) {
+                decorateDepthEdge(w.getBlockAt(left - 1, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(right + 1, y, z), y, minY);
+            }
+        }
     }
     private void carveRiftColumn(World w, int x, int z, int topY, int minY) {
         int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
@@ -795,6 +805,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         riftPathX.clear();
         riftBuilt = false;
         riftCenter = null;
+        activeDz.clear();
     }
 
     private void startAmbienceTask(World w) {
