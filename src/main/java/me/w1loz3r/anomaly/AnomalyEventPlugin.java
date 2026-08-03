@@ -20,15 +20,17 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     private final Map<String, Material> changedBlocks = new HashMap<>();
     private final Map<Integer, int[]> riftSliceEdges = new HashMap<>();
+
     private int ambienceTaskId = -1;
     private int weatherLockTaskId = -1;
     private int hazardTaskId = -1;
 
-    private final Map<Integer, int[]> riftSliceEdges = new HashMap<>();
     private Location riftCenter;
     private boolean riftBuilt = false;
 
     private RiftDataStore dataStore;
+
+
 
     @Override
     public void onEnable() {
@@ -445,7 +447,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (enable) w.setTime(18000L);
     }
 
-    private void buildRiftToBedrock(World w) {
+  private void buildRiftToBedrock(World w) {
     int cx;
     int cz;
 
@@ -466,6 +468,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     int halfWidth = getConfig().getInt("rift.half-width", 2);
 
     riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
+    riftSliceEdges.clear(); // важно: сброс перед новой генерацией
     int minY = w.getMinHeight() + 1;
 
     int maxOffset = Math.max(2, halfWidth + 2);
@@ -493,6 +496,9 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         int cx1 = pathX - crackHalf;
         int cx2 = pathX + crackHalf;
+
+        // ВАЖНО: сохраняем реальные края среза для частиц/expand width
+        riftSliceEdges.put(z, new int[]{cx1, cx2});
 
         // Основной прорез
         for (int x = cx1; x <= cx2; x++) {
