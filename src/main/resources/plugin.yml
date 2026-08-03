@@ -17,6 +17,8 @@ commands:
       /anomaly night <on|off>
       /anomaly rift size <length> <halfWidth> <jagged>
       /anomaly rift rebuild
+      /anomaly expand length <blocks>
+      /anomaly expand width <blocks>
     permission: anomaly.admin
 
 permissions:
