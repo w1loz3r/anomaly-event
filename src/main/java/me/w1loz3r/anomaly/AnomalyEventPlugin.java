@@ -278,7 +278,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
         }
     }
-
+    
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
         if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
@@ -305,9 +305,13 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int riftTopY = riftCenter.getBlockY();
         if (to.getY() >= (riftTopY - 0.2)) return;
 
-        int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
-        if (to.getY() <= teleportY) {
-            Location safe = findSafeLocation(w);
+        // Было слишком рано и слишком высоко. Теперь глубже и естественнее:
+        int minHeight = w.getMinHeight();
+        int depthOffset = getConfig().getInt("safety.teleport-depth-below-top", 14); // новый конфиг
+        int teleportTriggerY = Math.max(minHeight + 3, riftTopY - depthOffset);
+
+        if (to.getY() <= teleportTriggerY) {
+            Location safe = findSafeLocationNearRift(w);
             p.teleport(safe);
             p.playSound(safe, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.8f);
             p.sendMessage("§5[Аномалия] §dТебя выбросило из разлома.");
@@ -571,29 +575,32 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
         }
     }
-
+    
     private void spawnRiftParticles(World w) {
-    if (riftCenter == null) return;
+        if (riftCenter == null) return;
 
-    int length = getConfig().getInt("rift.length", 22);
-    int cx = riftCenter.getBlockX();
-    int cz = riftCenter.getBlockZ();
-    int y = riftCenter.getBlockY();
+        int length = getConfig().getInt("rift.length", 22);
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
 
-    for (int i = -length / 2; i <= length / 2; i++) {
-        double px = cx + ThreadLocalRandom.current().nextDouble(-2.0, 2.0);
-        double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.4, 0.4);
-        double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
+        int y = riftCenter.getBlockY();
 
-        w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
-        w.spawnParticle(Particle.SOUL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.01);
-        w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
+        for (int i = -length / 2; i <= length / 2; i++) {
+            // Теперь частицы гуляют по актуальной ширине разлома
+            double px = cx + ThreadLocalRandom.current().nextDouble(-halfWidth - 0.6, halfWidth + 0.6);
+            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
+            double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
 
-        if (ThreadLocalRandom.current().nextInt(100) < 8) {
-            w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 2, 0.1, 0.15, 0.1, 0.02);
+            w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
+            w.spawnParticle(Particle.SOUL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.01);
+            w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
+
+            if (ThreadLocalRandom.current().nextInt(100) < 8) {
+                w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 2, 0.1, 0.15, 0.1, 0.02);
+            }
         }
     }
-}
     private void decorateEdge(Block b, int y, int minY) {
     Material cur = b.getType();
 
@@ -1025,7 +1032,8 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         addDefault("safety.teleport-min-y", 15);
         addDefault("safety.safe-offset-x", 6);
         addDefault("safety.safe-offset-z", 0);
-
+        addDefault("safety.teleport-depth-below-top", 14);
+        addDefault("safety.rift-edge-margin", 2);
         getConfig().options().copyDefaults(true);
         saveConfig();
     }
