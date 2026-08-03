@@ -22,7 +22,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     private int weatherLockTaskId = -1;
     private int hazardTaskId = -1;
 
-    private final Map<String, Material> changedBlocks = new HashMap<>();
+    private final Map<Integer, int[]> riftSliceEdges = new HashMap<>();
     private Location riftCenter;
     private boolean riftBuilt = false;
 
@@ -599,24 +599,30 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (riftCenter == null) return;
 
         int length = getConfig().getInt("rift.length", 22);
-        int halfWidth = getConfig().getInt("rift.half-width", 2);
-
-        int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
         int y = riftCenter.getBlockY();
 
-        for (int i = -length / 2; i <= length / 2; i++) {
-            // Теперь частицы гуляют по актуальной ширине разлома
-            double px = cx + ThreadLocalRandom.current().nextDouble(-halfWidth - 0.6, halfWidth + 0.6);
-            double pz = cz + i + ThreadLocalRandom.current().nextDouble(-0.45, 0.45);
-            double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
+        for (int dz = -length / 2; dz <= length / 2; dz++) {
+            int z = cz + dz;
 
-            w.spawnParticle(Particle.PORTAL, px, py, pz, 6, 0.2, 0.3, 0.2, 0.02);
-            w.spawnParticle(Particle.SOUL, px, py, pz, 3, 0.15, 0.2, 0.15, 0.01);
-            w.spawnParticle(Particle.SMOKE, px, py, pz, 4, 0.15, 0.2, 0.15, 0.001);
+            int[] edges = riftSliceEdges.get(z);
+            if (edges == null) continue;
 
-            if (ThreadLocalRandom.current().nextInt(100) < 8) {
-                w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 2, 0.1, 0.15, 0.1, 0.02);
+            int left = Math.min(edges[0], edges[1]);
+            int right = Math.max(edges[0], edges[1]);
+
+            for (int n = 0; n < 3; n++) {
+                double px = ThreadLocalRandom.current().nextDouble(left, right + 1.0);
+                double pz = z + ThreadLocalRandom.current().nextDouble(-0.35, 0.35);
+                double py = y + ThreadLocalRandom.current().nextDouble(-1.0, 2.5);
+
+                w.spawnParticle(Particle.PORTAL, px, py, pz, 4, 0.15, 0.25, 0.15, 0.02);
+                w.spawnParticle(Particle.SOUL, px, py, pz, 2, 0.10, 0.15, 0.10, 0.01);
+                w.spawnParticle(Particle.SMOKE, px, py, pz, 3, 0.10, 0.15, 0.10, 0.001);
+
+                if (ThreadLocalRandom.current().nextInt(100) < 8) {
+                    w.spawnParticle(Particle.REVERSE_PORTAL, px, py, pz, 1, 0.08, 0.10, 0.08, 0.02);
+                }
             }
         }
     }
@@ -946,11 +952,6 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         getConfig().set("rift.length", newLength);
         cleanupVegetationAroundRift(w, cx, cz, topY, newLength, halfWidth);
     }
-
-    /**
-     * Geometrically widens the rift by {@code extraBlocks} blocks on each side.
-     * Config {@code rift.half-width} is updated by {@code extraBlocks}.
-     */
     private void expandRiftWidth(World w, int extraBlocks) {
         if (riftCenter == null) return;
 
@@ -964,30 +965,35 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         for (int dz = -length / 2; dz <= length / 2; dz++) {
             int z = cz + dz;
 
-            // Left expansion
-            for (int x = cx - halfWidth - extraBlocks; x <= cx - halfWidth - 1; x++) {
+            int[] oldEdges = riftSliceEdges.get(z);
+            int oldLeft = (oldEdges != null) ? oldEdges[0] : (cx - halfWidth);
+            int oldRight = (oldEdges != null) ? oldEdges[1] : (cx + halfWidth);
+
+            // расширяем от РЕАЛЬНЫХ краёв текущего среза
+            for (int x = oldLeft - extraBlocks; x <= oldLeft - 1; x++) {
+                carveColumn(w, x, z, topY, minY);
+            }
+            for (int x = oldRight + 1; x <= oldRight + extraBlocks; x++) {
                 carveColumn(w, x, z, topY, minY);
             }
 
-            // Right expansion
-            for (int x = cx + halfWidth + 1; x <= cx + halfWidth + extraBlocks; x++) {
-                carveColumn(w, x, z, topY, minY);
-            }
+            int newLeft = oldLeft - extraBlocks;
+            int newRight = oldRight + extraBlocks;
+            riftSliceEdges.put(z, new int[]{newLeft, newRight});
 
-            // Decorate new outer edges at surface and depth
-            int newLeftEdge  = cx - halfWidth - extraBlocks - 1;
-            int newRightEdge = cx + halfWidth + extraBlocks + 1;
+            int outerLeft = newLeft - 1;
+            int outerRight = newRight + 1;
 
-            decorateEdge(w.getBlockAt(newLeftEdge,  topY, z), topY, minY);
-            decorateEdge(w.getBlockAt(newRightEdge, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(outerLeft, topY, z), topY, minY);
+            decorateEdge(w.getBlockAt(outerRight, topY, z), topY, minY);
 
             for (int y = topY - 2; y >= minY + 1; y--) {
-                decorateDepthEdge(w.getBlockAt(newLeftEdge,      y, z), y, minY);
-                decorateDepthEdge(w.getBlockAt(newRightEdge,     y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(outerLeft, y, z), y, minY);
+                decorateDepthEdge(w.getBlockAt(outerRight, y, z), y, minY);
 
                 if (ThreadLocalRandom.current().nextInt(100) < 55) {
-                    decorateDepthEdge(w.getBlockAt(newLeftEdge  - 1, y, z), y, minY);
-                    decorateDepthEdge(w.getBlockAt(newRightEdge + 1, y, z), y, minY);
+                    decorateDepthEdge(w.getBlockAt(outerLeft - 1, y, z), y, minY);
+                    decorateDepthEdge(w.getBlockAt(outerRight + 1, y, z), y, minY);
                 }
             }
         }
