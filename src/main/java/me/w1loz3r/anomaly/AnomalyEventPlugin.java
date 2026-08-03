@@ -469,7 +469,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
     riftCenter = new Location(w, cx + 0.5, topY, cz + 0.5);
     riftSliceEdges.clear(); // важно: сброс перед новой генерацией
-    int minY = w.getMinHeight() + 1;
+    int minY = w.getMinHeight();
 
     int maxOffset = Math.max(2, halfWidth + 2);
     int pathX = cx;
@@ -946,7 +946,7 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         int topY = riftCenter.getBlockY();
         int length = getConfig().getInt("rift.length", 22);
         int halfWidth = getConfig().getInt("rift.half-width", 2);
-        int minY = w.getMinHeight() + 1;
+        int minY = w.getMinHeight();
 
         // Negative (front) end extension
         buildRiftSlices(w, cx, cz, topY, halfWidth, minY,
