@@ -172,10 +172,9 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aНочь зафиксирована." : "§aЦикл дня восстановлен.");
                 return true;
             }
-            case "rift" -> {
-                if (args.length < 2) {
-                    sender.sendMessage("§e/anomaly rift <size|rebuild|expand>");
-                    return true;
+               sender.sendMessage("§aРазлом расширен: length " + oldLength + " -> " + newLength
+            + ", halfWidth " + oldHalfWidth + " -> " + newHalfWidth);
+    return true;
                 }
 
                 if (args[1].equalsIgnoreCase("size")) {
@@ -292,8 +291,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
         }
     }
-
-    @EventHandler
+@EventHandler
     public void onMove(PlayerMoveEvent e) {
         if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
         if (riftCenter == null) return;
