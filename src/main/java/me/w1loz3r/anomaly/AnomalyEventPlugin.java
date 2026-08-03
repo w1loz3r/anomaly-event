@@ -508,7 +508,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 Block b = w.getBlockAt(x, y, z);
                 Material m = b.getType();
 
-                if (m == Material.BEDROCK) continue;
+                
                 if (m != Material.AIR) {
                     rememberBlock(b);
                     b.setType(Material.AIR, false);
@@ -862,7 +862,7 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         for (int y = startY; y >= minY; y--) {
             Block b = w.getBlockAt(x, y, z);
             Material m = b.getType();
-            if (m == Material.BEDROCK) continue;
+            
             if (m != Material.AIR) {
                 rememberBlock(b);
                 b.setType(Material.AIR, false);
