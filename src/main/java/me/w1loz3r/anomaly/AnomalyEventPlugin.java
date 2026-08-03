@@ -922,7 +922,7 @@ private void decorateDepthEdge(Block b, int y, int minY) {
             decorateEdge(w.getBlockAt(cx1 - 1, topY, z), topY, minY);
             decorateEdge(w.getBlockAt(cx2 + 1, topY, z), topY, minY);
 
-            for (int y = topY - 2; y >= minY + 1; y--) {
+            for (int y = topY - 2; y >= minY; y--) {
                 decorateDepthEdge(w.getBlockAt(cx1 - 1, y, z), y, minY);
                 decorateDepthEdge(w.getBlockAt(cx2 + 1, y, z), y, minY);
 
@@ -968,7 +968,7 @@ private void decorateDepthEdge(Block b, int y, int minY) {
         int topY = riftCenter.getBlockY();
         int length = getConfig().getInt("rift.length", 22);
         int halfWidth = getConfig().getInt("rift.half-width", 2);
-        int minY = w.getMinHeight() + 1;
+        int minY = w.getMinHeight();
 
         for (int dz = -length / 2; dz <= length / 2; dz++) {
             int z = cz + dz;
