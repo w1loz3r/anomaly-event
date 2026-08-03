@@ -303,7 +303,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         if (!(inZ && inX)) return;
 
         int riftTopY = riftCenter.getBlockY();
-        if (to.getY() >= (riftTopY - 0.2)) return;
+        if (to.getY() >= (riftTopY - 0.6)) return;
 
         int teleportY = getConfig().getInt("safety.teleport-min-y", 15);
         if (to.getY() <= teleportY) {
