@@ -23,7 +23,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
     private int hazardTaskId = -1;
 
     private final Map<String, Material> changedBlocks = new HashMap<>();
-    private final Map<Integer, Integer> riftPathX = new HashMap<>(); // dz -> pathX
     private final Map<Integer, Integer> riftPathX = new HashMap<>(); // dz -> x оси трещины
     private final Set<Integer> activeDz = new HashSet<>();
 
@@ -172,9 +171,10 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                 sender.sendMessage(on ? "§aНочь зафиксирована." : "§aЦикл дня восстановлен.");
                 return true;
             }
-               sender.sendMessage("§aРазлом расширен: length " + oldLength + " -> " + newLength
-            + ", halfWidth " + oldHalfWidth + " -> " + newHalfWidth);
-    return true;
+            case "rift" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§e/anomaly rift <size|rebuild|expand>");
+                    return true;
                 }
 
                 if (args[1].equalsIgnoreCase("size")) {
@@ -268,7 +268,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     boolean wasEnabled = getConfig().getBoolean("state.anomaly-enabled", false);
 
                     if (riftBuilt) {
-                        (w);
+                        restoreRift(w);
                         dataStore.clear();
                     }
 
@@ -291,7 +291,8 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
         }
     }
-@EventHandler
+
+    @EventHandler
     public void onMove(PlayerMoveEvent e) {
         if (!getConfig().getBoolean("state.anomaly-enabled", false)) return;
         if (riftCenter == null) return;
@@ -459,8 +460,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int drift = 0;
 
         riftPathX.clear();
-        riftPathX.put(dz, pathX);
-        activeDz.add(dz);
+        activeDz.clear();
 
         for (int dz = -length / 2; dz <= length / 2; dz++) {
             if (ThreadLocalRandom.current().nextInt(100) < 22) {
@@ -474,6 +474,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
             pathX += drift;
             pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+
             riftPathX.put(dz, pathX);
             activeDz.add(dz);
 
@@ -513,6 +514,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         riftBuilt = true;
     }
+
     private void growRiftSmart(World w, int oldLength, int oldHalfWidth, int newLength, int newHalfWidth) {
         int cx = riftCenter.getBlockX();
         int cz = riftCenter.getBlockZ();
@@ -525,11 +527,10 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int targetMinDz = -newHalfLen;
         int targetMaxDz = newHalfLen;
 
-    // 1) если после рестарта пусто — восстановим базовую ось
         if (riftPathX.isEmpty()) {
             int pathX = cx;
             int drift = 0;
-            int maxOffset = Math.max(2, newHalfWidth + 2);
+            int maxOffsetSeed = Math.max(2, newHalfWidth + 2);
 
             for (int dz = -oldHalfLen; dz <= oldHalfLen; dz++) {
                 Random rr = new Random(0x9E3779B97F4A7C15L + dz * 1315423911L);
@@ -538,16 +539,15 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
                     drift = Math.max(-1, Math.min(1, drift));
                 }
                 if (rr.nextInt(100) < 8) {
-                pathX += rr.nextInt(3) - 1;
+                    pathX += rr.nextInt(3) - 1;
                 }
                 pathX += drift;
-                pathX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, pathX));
+                pathX = Math.max(cx - maxOffsetSeed, Math.min(cx + maxOffsetSeed, pathX));
                 riftPathX.put(dz, pathX);
                 activeDz.add(dz);
             }
         }
 
-        // 2) наращиваем КОНЕЦ +Z
         int curMaxDz = activeDz.stream().max(Integer::compareTo).orElse(oldHalfLen);
         int curMaxX = riftPathX.getOrDefault(curMaxDz, cx);
         int maxOffset = Math.max(2, newHalfWidth + 2);
@@ -557,7 +557,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             int z = cz + nextDz;
 
             Random rr = new Random(0xC2B2AE3D27D4EB4FL + nextDz * 2654435761L);
-            int step = rr.nextInt(100) < 70 ? 0 : (rr.nextBoolean() ? 1 : -1); // чаще прямо, иногда сдвиг
+            int step = rr.nextInt(100) < 70 ? 0 : (rr.nextBoolean() ? 1 : -1);
             curMaxX += step;
             curMaxX = Math.max(cx - maxOffset, Math.min(cx + maxOffset, curMaxX));
 
@@ -569,7 +569,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             curMaxDz = nextDz;
         }
 
-        // 3) наращиваем КОНЕЦ -Z
         int curMinDz = activeDz.stream().min(Integer::compareTo).orElse(-oldHalfLen);
         int curMinX = riftPathX.getOrDefault(curMinDz, cx);
 
@@ -590,7 +589,6 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             curMinDz = nextDz;
         }
 
-        // 4) локальное утолщение на уже существующих сегментах (без квадрата)
         if (newHalfWidth > oldHalfWidth) {
             for (int dz : new ArrayList<>(activeDz)) {
                 int xCenter = riftPathX.getOrDefault(dz, cx);
@@ -640,6 +638,7 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
             }
         }
     }
+
     private void carveRiftColumn(World w, int x, int z, int topY, int minY) {
         int startY = Math.max(topY + 3, w.getHighestBlockYAt(x, z) + 2);
 
@@ -801,9 +800,9 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
         changedBlocks.clear();
         riftPathX.clear();
+        activeDz.clear();
         riftBuilt = false;
         riftCenter = null;
-        activeDz.clear();
     }
 
     private void startAmbienceTask(World w) {
