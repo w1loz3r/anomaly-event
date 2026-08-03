@@ -405,6 +405,25 @@ public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
         int y = w.getHighestBlockYAt(x, z) + 1;
         return new Location(w, x + 0.5, y, z + 0.5, spawn.getYaw(), spawn.getPitch());
     }
+    private Location findSafeLocationNearRift(World w) {
+        if (riftCenter == null) return findSafeLocation(w);
+
+        int cx = riftCenter.getBlockX();
+        int cz = riftCenter.getBlockZ();
+        int topY = riftCenter.getBlockY();
+
+        int halfWidth = getConfig().getInt("rift.half-width", 2);
+        int margin = getConfig().getInt("safety.rift-edge-margin", 2);
+        int side = ThreadLocalRandom.current().nextBoolean() ? 1 : -1;
+
+        int x = cx + side * (halfWidth + margin);
+        int z = cz + ThreadLocalRandom.current().nextInt(-2, 3);
+
+        int y = w.getHighestBlockYAt(x, z) + 1;
+        y = Math.max(y, topY + 1);
+
+        return new Location(w, x + 0.5, y, z + 0.5, 0f, 0f);
+    }
 
     private void applyStorm(World w, boolean enable) {
         if (enable) {
