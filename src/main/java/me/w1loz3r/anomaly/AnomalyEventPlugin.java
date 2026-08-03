@@ -18,6 +18,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public final class AnomalyEventPlugin extends JavaPlugin implements Listener {
 
+    private final Map<String, Material> changedBlocks = new HashMap<>();
+    private final Map<Integer, int[]> riftSliceEdges = new HashMap<>();
     private int ambienceTaskId = -1;
     private int weatherLockTaskId = -1;
     private int hazardTaskId = -1;
